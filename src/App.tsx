@@ -804,6 +804,31 @@ function NavBar({
   activeElection: Election | null
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState('')
+
+  useEffect(() => {
+    const ids = ['parliament', 'court', 'parties', 'approval', 'constitution', 'about', 'join']
+    const observers: IntersectionObserver[] = []
+    const visible = new Set<string>()
+
+    ids.forEach(id => {
+      const el = document.getElementById(id)
+      if (!el) return
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) visible.add(id)
+          else visible.delete(id)
+          // Pick the topmost visible section
+          const first = ids.find(i => visible.has(i))
+          setActiveSection(first ?? '')
+        },
+        { threshold: 0.15 }
+      )
+      obs.observe(el)
+      observers.push(obs)
+    })
+    return () => observers.forEach(o => o.disconnect())
+  }, [])
 
   return (
     <nav
@@ -837,24 +862,27 @@ function NavBar({
 
         <ul className="hidden md:flex items-center gap-8">
           {[
-            { label: 'Parliament', href: '#parliament' },
-            { label: 'High Court', href: '#court' },
-            { label: 'Parties', href: '#parties' },
-            { label: 'Approval', href: '#approval' },
-            { label: 'Constitution', href: '#constitution' },
-            { label: 'About', href: '#about' },
-          ].map((item) => (
-            <li key={item.label}>
-              <a href={item.href}
-                className="text-sm font-medium tracking-wide transition-colors duration-200"
-                style={{ color: '#b8c4e8', fontFamily: 'var(--font-body)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#c9a227')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = '#b8c4e8')}
-              >
-                {item.label}
-              </a>
-            </li>
-          ))}
+            { label: 'Parliament', href: '#parliament', id: 'parliament' },
+            { label: 'High Court', href: '#court', id: 'court' },
+            { label: 'Parties', href: '#parties', id: 'parties' },
+            { label: 'Approval', href: '#approval', id: 'approval' },
+            { label: 'Constitution', href: '#constitution', id: 'constitution' },
+            { label: 'About', href: '#about', id: 'about' },
+          ].map((item) => {
+            const isActive = activeSection === item.id
+            return (
+              <li key={item.label}>
+                <a href={item.href}
+                  className="text-sm font-medium tracking-wide transition-colors duration-200"
+                  style={{ color: isActive ? '#c9a227' : '#b8c4e8', fontFamily: 'var(--font-body)', borderBottom: isActive ? '1px solid #c9a227' : '1px solid transparent', paddingBottom: 2 }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = '#c9a227')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = isActive ? '#c9a227' : '#b8c4e8')}
+                >
+                  {item.label}
+                </a>
+              </li>
+            )
+          })}
           {activeElection && (
             <li>
               <a
