@@ -784,6 +784,7 @@ function UserMenu({ session, signOut, isAdmin, onPartiesChanged, onElectionChang
 
 function NavBar({
   scrolled,
+  activeSection,
   session,
   loading,
   isAdmin,
@@ -794,6 +795,7 @@ function NavBar({
   activeElection,
 }: {
   scrolled: boolean
+  activeSection: string
   session: Session | null
   loading: boolean
   isAdmin: boolean
@@ -804,31 +806,6 @@ function NavBar({
   activeElection: Election | null
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [activeSection, setActiveSection] = useState('')
-
-  useEffect(() => {
-    const ids = ['parliament', 'court', 'parties', 'approval', 'constitution', 'about', 'join']
-    const observers: IntersectionObserver[] = []
-    const visible = new Set<string>()
-
-    ids.forEach(id => {
-      const el = document.getElementById(id)
-      if (!el) return
-      const obs = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) visible.add(id)
-          else visible.delete(id)
-          // Pick the topmost visible section
-          const first = ids.find(i => visible.has(i))
-          setActiveSection(first ?? '')
-        },
-        { threshold: 0.15 }
-      )
-      obs.observe(el)
-      observers.push(obs)
-    })
-    return () => observers.forEach(o => o.disconnect())
-  }, [])
 
   return (
     <nav
@@ -2531,15 +2508,36 @@ export default function App() {
 
   useEffect(() => { loadParties(); loadActiveElection() }, [])
 
+  const [activeSection, setActiveSection] = useState('')
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 60)
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  useEffect(() => {
+    const ids = ['parliament', 'court', 'parties', 'approval', 'constitution', 'about', 'join']
+    const onScroll = () => {
+      const mid = window.innerHeight * 0.4
+      let current = ''
+      for (const id of ids) {
+        const el = document.getElementById(id)
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.top <= mid) current = id
+      }
+      setActiveSection(current)
+      history.replaceState(null, '', current ? `#${current}` : window.location.pathname)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
     <div style={{ background: '#0a1a50' }}>
-      <NavBar scrolled={scrolled} session={session} loading={loading} isAdmin={isAdmin} signInWithDiscord={signInWithDiscord} signOut={signOut} onPartiesChanged={loadParties} activeElection={activeElection} onElectionChanged={loadActiveElection} />
+      <NavBar scrolled={scrolled} activeSection={activeSection} session={session} loading={loading} isAdmin={isAdmin} signInWithDiscord={signInWithDiscord} signOut={signOut} onPartiesChanged={loadParties} activeElection={activeElection} onElectionChanged={loadActiveElection} />
       <Hero />
       <Institutions />
       <Parties parties={parties} loading={partiesLoading} />
