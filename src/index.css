@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,600&family=Inter:wght@300;400;500;600&family=IM+Fell+English:ital@0;1&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-fell: 'IM Fell English', Georgia, serif;
+
+  --color-navy: #0c1f3f;
+  --color-navy-mid: #1a3460;
+  --color-navy-light: #2d4f8a;
+  --color-gold: #c9a227;
+  --color-gold-light: #e8c96a;
+  --color-gold-pale: #f5e9be;
+  --color-cream: #f8f4ea;
+  --color-parchment: #ede4cc;
+  --color-crimson: #8b1a2a;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gold) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-gold);
+  border-radius: 3px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: #0c1f3f;
+  color: #f8f4ea;
+}
