@@ -1872,7 +1872,15 @@ function ApprovalPage({ parties, isAdmin }: { parties: Party[]; isAdmin: boolean
 
 function ElectionMap({ results, seatAssignment }: { results: VoteResult[]; seatAssignment: Record<number, string> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const hitDataRef = useRef<Uint8ClampedArray | null>(null)
+  const canvasDimsRef = useRef<{ w: number; h: number } | null>(null)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; idx: number } | null>(null)
+  const [seeds, setSeeds] = useState<SeedMap>({})
+
+  useEffect(() => { loadConstituencySeeds().then(setSeeds) }, [])
+
   const colorMap = Object.fromEntries(results.map(r => [r.party_id, r.party_color]))
+  const partyMap = Object.fromEntries(results.map(r => [r.party_id, { abbr: r.party_abbr ?? r.party_id, color: r.party_color, pct: r.percentage }]))
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -1880,7 +1888,6 @@ function ElectionMap({ results, seatAssignment }: { results: VoteResult[]; seatA
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Paint background immediately so the canvas never shows checkerboard
     ctx.fillStyle = '#050d28'
     ctx.fillRect(0, 0, canvas.width || 600, canvas.height || 600)
 
@@ -1892,23 +1899,43 @@ function ElectionMap({ results, seatAssignment }: { results: VoteResult[]; seatA
       const H = Math.round(img.naturalHeight * scale)
       canvas.width = W
       canvas.height = H
+      canvasDimsRef.current = { w: W, h: H }
 
-      // Re-fill after resizing (setting canvas.width resets content)
       ctx.fillStyle = '#050d28'
       ctx.fillRect(0, 0, W, H)
 
-      // Use an offscreen canvas for pixel analysis so the background fill
-      // doesn't pollute the dark-pixel detection used by the flood fill.
       const off = document.createElement('canvas')
       off.width = W; off.height = H
       const offCtx = off.getContext('2d')!
       offCtx.drawImage(img, 0, 0, W, H)
       const imageData = offCtx.getImageData(0, 0, W, H)
-      const data = imageData.data
+      const origData = imageData.data
+      const dispData = new Uint8ClampedArray(origData)
 
-      // Flood-fill each assigned constituency.
-      // White text labels split constituencies into disconnected dark regions,
-      // so we spray a grid of seed points around each centre to reach all pieces.
+      // Build Voronoi hit canvas using raw seed coords (no snapping)
+      const seedPx = CONSTITUENCIES.map(c => {
+        const s = seeds[c.name] ?? c
+        return { x: Math.round(s.px * W), y: Math.round(s.py * H) }
+      })
+
+      const hitData = new Uint8ClampedArray(dispData.length)
+      for (let py = 0; py < H; py++) {
+        for (let px = 0; px < W; px++) {
+          const pos = py * W + px
+          if (!isDark(origData, pos * 4)) continue
+          let bestI = 0, bestDist = Infinity
+          for (let i = 0; i < seedPx.length; i++) {
+            const dx = px - seedPx[i].x, dy = py - seedPx[i].y
+            const d = dx * dx + dy * dy
+            if (d < bestDist) { bestDist = d; bestI = i }
+          }
+          const idx = pos * 4
+          hitData[idx] = bestI + 1; hitData[idx+1] = 0; hitData[idx+2] = 0; hitData[idx+3] = 255
+        }
+      }
+      hitDataRef.current = hitData
+
+      // Flood-fill display canvas with party colors
       const SEED_OFFSETS = [
         [0, 0], [-0.04, 0], [0.04, 0], [0, -0.04], [0, 0.04],
         [-0.04, -0.04], [0.04, -0.04], [-0.04, 0.04], [0.04, 0.04],
@@ -1920,46 +1947,98 @@ function ElectionMap({ results, seatAssignment }: { results: VoteResult[]; seatA
         const hex = colorMap[partyId]
         if (!hex) continue
         const [r, g, b] = hexToRgb(hex)
+        const s = seeds[CONSTITUENCIES[i].name] ?? CONSTITUENCIES[i]
         for (const [dx, dy] of SEED_OFFSETS) {
-          const sx = Math.round((CONSTITUENCIES[i].px + dx) * W)
-          const sy = Math.round((CONSTITUENCIES[i].py + dy) * H)
-          canvasFloodFill(data, W, H, sx, sy, r, g, b)
+          const sx = Math.round((s.px + dx) * W)
+          const sy = Math.round((s.py + dy) * H)
+          canvasFloodFill(dispData, W, H, sx, sy, r, g, b)
         }
       }
 
-      // Replace every remaining transparent pixel with the page background colour.
-      // This covers: outside the map, water, and any unfilled areas.
-      // After this there are zero transparent pixels — no checkerboard possible.
-      for (let i = 0; i < data.length; i += 4) {
-        if (data[i + 3] < 128) {
-          data[i] = 5; data[i + 1] = 13; data[i + 2] = 40; data[i + 3] = 255
+      for (let i = 0; i < dispData.length; i += 4) {
+        if (dispData[i + 3] < 128) {
+          dispData[i] = 5; dispData[i + 1] = 13; dispData[i + 2] = 40; dispData[i + 3] = 255
         }
       }
 
-      // Write fills back to offscreen canvas
-      offCtx.putImageData(imageData, 0, 0)
-
-      // Render to display canvas.
-      // The modified 'off' canvas already has everything:
-      //   - party colors in constituency areas
-      //   - white border lines + labels (not touched — isDark is false for white)
-      //   - transparent pixels everywhere else (outside map + water)
-      // So just fill navy background then draw fills — no second image draw needed.
+      offCtx.putImageData(new ImageData(dispData, W, H), 0, 0)
       ctx.fillStyle = '#050d28'
       ctx.fillRect(0, 0, W, H)
-      ctx.globalCompositeOperation = 'source-over'
       ctx.drawImage(off, 0, 0)
     }
-  }, [seatAssignment, colorMap])
+  }, [seatAssignment, colorMap, JSON.stringify(seeds)])
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    const dims = canvasDimsRef.current
+    const hitData = hitDataRef.current
+    if (!canvas || !dims || !hitData) return
+    const rect = canvas.getBoundingClientRect()
+    const x = Math.round((e.clientX - rect.left) * (dims.w / rect.width))
+    const y = Math.round((e.clientY - rect.top) * (dims.h / rect.height))
+    if (x < 0 || y < 0 || x >= dims.w || y >= dims.h) { setTooltip(null); return }
+    const idx = hitData[(y * dims.w + x) * 4] - 1
+    if (idx >= 0 && idx < CONSTITUENCIES.length) {
+      setTooltip({ x: e.clientX, y: e.clientY, idx })
+    } else {
+      setTooltip(null)
+    }
+  }
 
   const hasVotes = results.some(r => r.votes > 0)
 
+  const tooltipLeft = tooltip
+    ? (tooltip.x + 220 + 20 > window.innerWidth ? tooltip.x - 220 - 12 : tooltip.x + 16)
+    : 0
+  const tooltipTop = tooltip ? tooltip.y - 8 : 0
+
+  const sortedResults = results.slice().sort((a, b) => b.percentage - a.percentage)
+  const winnerPartyId = tooltip !== null ? seatAssignment[tooltip.idx] : null
+
   return (
     <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#050d28' }}>
-      <canvas ref={canvasRef} style={{ maxWidth: '100%', width: '100%', display: 'block', opacity: hasVotes ? 1 : 0.25, transition: 'opacity 0.6s' }} />
+      <canvas
+        ref={canvasRef}
+        style={{ maxWidth: '100%', width: '100%', display: 'block', opacity: hasVotes ? 1 : 0.25, transition: 'opacity 0.6s', cursor: 'crosshair' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setTooltip(null)}
+      />
       {!hasVotes && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ color: '#6a80b0', fontFamily: 'var(--font-body)', fontSize: 13 }}>Awaiting first votes…</span>
+        </div>
+      )}
+      {tooltip !== null && sortedResults.length > 0 && (
+        <div style={{
+          position: 'fixed', left: tooltipLeft, top: tooltipTop,
+          background: '#0a1a50', border: '1px solid rgba(201,162,39,0.35)',
+          padding: '12px 14px', zIndex: 1000, width: 212,
+          pointerEvents: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', fontFamily: 'var(--font-display)', marginBottom: 3, borderBottom: '1px solid rgba(201,162,39,0.2)', paddingBottom: 7 }}>
+            {CONSTITUENCIES[tooltip.idx].name}
+          </div>
+          {winnerPartyId && partyMap[winnerPartyId] && (
+            <div style={{ fontSize: 10, color: partyMap[winnerPartyId].color, fontFamily: 'var(--font-body)', marginBottom: 8, fontWeight: 700 }}>
+              ✓ Seat: {partyMap[winnerPartyId].abbr}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {sortedResults.map(r => (
+              <div key={r.party_id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <div style={{ width: 8, height: 8, background: r.party_color, borderRadius: 1, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: '#b8c4e8', fontFamily: 'var(--font-body)' }}>{r.party_abbr ?? r.party_id}</span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: r.party_color, fontFamily: 'var(--font-body)', fontVariantNumeric: 'tabular-nums' }}>{r.percentage}%</span>
+                </div>
+                <div style={{ height: 3, background: 'rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${r.percentage}%`, background: r.party_color }} />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
