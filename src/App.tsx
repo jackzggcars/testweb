@@ -507,8 +507,81 @@ function AdminPanelElections({ onElectionChanged }: { onElectionChanged: () => v
   )
 }
 
+function AdminPanelConstitution() {
+  const [content, setContent] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    supabase.from('anderside_constitution').select('content').eq('id', 1).single().then(({ data }) => {
+      if (data?.content) setContent(data.content)
+      setLoading(false)
+    })
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    await supabase.from('anderside_constitution').upsert({ id: 1, content })
+    setSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  if (loading) return (
+    <div style={{ padding: 32, textAlign: 'center', color: '#3d4f70', fontFamily: 'var(--font-body)', fontSize: 13 }}>Loading…</div>
+  )
+
+  return (
+    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 11, color: '#6a80b0', fontFamily: 'var(--font-body)', letterSpacing: '0.1em' }}>
+        Edit the full text of the Anderside Constitution. Supports markdown — use # for headings, ** for bold, * for italic.
+      </div>
+      <textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        rows={22}
+        style={{
+          width: '100%',
+          background: '#060f30',
+          border: '1px solid rgba(201,162,39,0.25)',
+          color: '#c8d4f0',
+          fontFamily: 'monospace',
+          fontSize: 12,
+          lineHeight: 1.6,
+          padding: '12px 14px',
+          resize: 'vertical',
+          outline: 'none',
+          boxSizing: 'border-box',
+        }}
+        placeholder="# Constitution of Anderside&#10;&#10;## Article I — ..."
+      />
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          style={{
+            padding: '9px 24px',
+            background: saving ? 'rgba(201,162,39,0.2)' : '#c9a227',
+            color: saving ? '#c9a227' : '#050d28',
+            fontFamily: 'var(--font-body)',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            border: '1px solid #c9a227',
+            cursor: saving ? 'wait' : 'pointer',
+          }}
+        >
+          {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save Constitution'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function AdminPanel({ onClose, onPartiesChanged, onElectionChanged }: { onClose: () => void; onPartiesChanged: () => void; onElectionChanged: () => void }) {
-  const [tab, setTab] = useState<'admins' | 'parties' | 'elections'>('admins')
+  const [tab, setTab] = useState<'admins' | 'parties' | 'elections' | 'constitution'>('admins')
 
   useEffect(() => {
     const scrollY = window.scrollY
@@ -567,26 +640,29 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged }: { onClose:
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid rgba(201,162,39,0.15)' }}>
-          {(['admins', 'parties', 'elections'] as const).map((t) => (
+        <div style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid rgba(201,162,39,0.15)', overflowX: 'auto' }}>
+          {(['admins', 'parties', 'elections', 'constitution'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className="px-6 py-3 text-xs font-bold uppercase tracking-widest transition-all duration-200"
+              className="px-5 py-3 text-xs font-bold uppercase tracking-widest transition-all duration-200 whitespace-nowrap"
               style={{
                 fontFamily: 'var(--font-body)',
-                letterSpacing: '0.2em',
+                letterSpacing: '0.15em',
                 color: tab === t ? '#c9a227' : '#3d4f70',
                 borderBottom: tab === t ? '2px solid #c9a227' : '2px solid transparent',
                 marginBottom: -1,
               }}
             >
-              {t === 'admins' ? '★ Admins' : t === 'parties' ? '🏛 Parties' : '🗳 Elections'}
+              {t === 'admins' ? '★ Admins' : t === 'parties' ? '🏛 Parties' : t === 'elections' ? '🗳 Elections' : '📜 Constitution'}
             </button>
           ))}
         </div>
 
         {/* Content */}
         <div style={{ overflowY: 'auto', flex: 1 }}>
-          {tab === 'admins' ? <AdminPanelAdmins /> : tab === 'parties' ? <AdminPanelParties onPartiesChanged={onPartiesChanged} /> : <AdminPanelElections onElectionChanged={onElectionChanged} />}
+          {tab === 'admins' ? <AdminPanelAdmins />
+            : tab === 'parties' ? <AdminPanelParties onPartiesChanged={onPartiesChanged} />
+            : tab === 'elections' ? <AdminPanelElections onElectionChanged={onElectionChanged} />
+            : <AdminPanelConstitution />}
         </div>
       </div>
     </div>
