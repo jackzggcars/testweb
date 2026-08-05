@@ -2841,7 +2841,8 @@ export default function App() {
 
   const handleDismissElection = async (id: string) => {
     await dismissElection(id)
-    setActiveElection(e => e?.id === id ? null : e)
+    // Re-run loadActiveElection — it now checks localStorage dismissed list too
+    getActiveElection().then(e => setActiveElection(e ?? null))
   }
 
   const loadParties = () => {

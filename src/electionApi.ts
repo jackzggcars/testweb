@@ -18,6 +18,7 @@ export type VoteResult = {
 }
 
 export async function getActiveElection(): Promise<Election | null> {
+  const dismissed = getDismissedElectionIds()
   const { data } = await supabase
     .from('anderside_elections')
     .select('*')
@@ -25,15 +26,32 @@ export async function getActiveElection(): Promise<Election | null> {
     .order('started_at', { ascending: false })
     .limit(1)
     .maybeSingle()
-  return data ?? null
+  if (!data) return null
+  if (dismissed.includes(data.id)) return null
+  return data
 }
 
 export async function dismissElection(id: string): Promise<void> {
-  const { error } = await supabase
+  // Try DB first; if the status column has a constraint that rejects 'dismissed',
+  // the update will fail — we fall back to a client-side dismissed list in that case.
+  await supabase
     .from('anderside_elections')
     .update({ status: 'dismissed' })
     .eq('id', id)
-  if (error) throw new Error(error.message)
+  // Always write to localStorage as a reliable fallback
+  const key = 'anderside_dismissed_elections'
+  const existing: string[] = JSON.parse(localStorage.getItem(key) ?? '[]')
+  if (!existing.includes(id)) {
+    localStorage.setItem(key, JSON.stringify([...existing, id]))
+  }
+}
+
+export function getDismissedElectionIds(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem('anderside_dismissed_elections') ?? '[]')
+  } catch {
+    return []
+  }
 }
 
 export async function getAllElections(): Promise<Election[]> {
