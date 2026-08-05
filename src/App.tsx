@@ -379,7 +379,7 @@ function AdminPanelParties({ onPartiesChanged }: { onPartiesChanged: () => void 
   )
 }
 
-function AdminPanelElections({ onElectionChanged }: { onElectionChanged: () => void }) {
+function AdminPanelElections({ onElectionChanged, onDismissElection }: { onElectionChanged: () => void; onDismissElection: (id: string) => void }) {
   const [elections, setElections] = useState<Election[]>([])
   const [loading, setLoading] = useState(true)
   const [name, setName] = useState('')
@@ -485,7 +485,7 @@ function AdminPanelElections({ onElectionChanged }: { onElectionChanged: () => v
                       )}
                     </div>
                   </div>
-                  {el.status === 'active' && (
+                  {el.status === 'active' ? (
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                       <button onClick={() => handleClose(el.id, true)} disabled={saving}
                         style={{ fontSize: 11, padding: '5px 10px', background: '#c41230', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontWeight: 600, opacity: saving ? 0.4 : 1 }}>
@@ -496,6 +496,11 @@ function AdminPanelElections({ onElectionChanged }: { onElectionChanged: () => v
                         Close
                       </button>
                     </div>
+                  ) : (
+                    <button onClick={() => onDismissElection(el.id)}
+                      style={{ fontSize: 11, padding: '5px 10px', background: 'transparent', color: '#6a80b0', border: '1px solid rgba(106,128,176,0.3)', cursor: 'pointer', fontFamily: 'var(--font-body)', flexShrink: 0 }}>
+                      Dismiss Results
+                    </button>
                   )}
                 </div>
               </div>
@@ -618,7 +623,7 @@ function AdminPanelConstitution() {
   )
 }
 
-function AdminPanel({ onClose, onPartiesChanged, onElectionChanged }: { onClose: () => void; onPartiesChanged: () => void; onElectionChanged: () => void }) {
+function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissElection }: { onClose: () => void; onPartiesChanged: () => void; onElectionChanged: () => void; onDismissElection: (id: string) => void }) {
   const [tab, setTab] = useState<'admins' | 'parties' | 'elections' | 'constitution'>('admins')
 
   useEffect(() => {
@@ -699,7 +704,7 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged }: { onClose:
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {tab === 'admins' ? <AdminPanelAdmins />
             : tab === 'parties' ? <AdminPanelParties onPartiesChanged={onPartiesChanged} />
-            : tab === 'elections' ? <AdminPanelElections onElectionChanged={onElectionChanged} />
+            : tab === 'elections' ? <AdminPanelElections onElectionChanged={onElectionChanged} onDismissElection={onDismissElection} />
             : <AdminPanelConstitution />}
         </div>
       </div>
@@ -707,7 +712,7 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged }: { onClose:
   )
 }
 
-function UserMenu({ session, signOut, isAdmin, onPartiesChanged, onElectionChanged }: { session: Session; signOut: () => void; isAdmin: boolean; onPartiesChanged: () => void; onElectionChanged: () => void }) {
+function UserMenu({ session, signOut, isAdmin, onPartiesChanged, onElectionChanged, onDismissElection }: { session: Session; signOut: () => void; isAdmin: boolean; onPartiesChanged: () => void; onElectionChanged: () => void; onDismissElection: (id: string) => void }) {
   const [open, setOpen] = useState(false)
   const [adminPanelOpen, setAdminPanelOpen] = useState(false)
   const user = session.user
@@ -777,7 +782,7 @@ function UserMenu({ session, signOut, isAdmin, onPartiesChanged, onElectionChang
           </button>
         </div>
       )}
-      {adminPanelOpen && <AdminPanel onClose={() => setAdminPanelOpen(false)} onPartiesChanged={onPartiesChanged} onElectionChanged={onElectionChanged} />}
+      {adminPanelOpen && <AdminPanel onClose={() => setAdminPanelOpen(false)} onPartiesChanged={onPartiesChanged} onElectionChanged={onElectionChanged} onDismissElection={onDismissElection} />}
     </div>
   )
 }
@@ -792,6 +797,7 @@ function NavBar({
   signOut,
   onPartiesChanged,
   onElectionChanged,
+  onDismissElection,
   activeElection,
 }: {
   scrolled: boolean
@@ -803,6 +809,7 @@ function NavBar({
   signOut: () => void
   onPartiesChanged: () => void
   onElectionChanged: () => void
+  onDismissElection: (id: string) => void
   activeElection: Election | null
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -867,12 +874,17 @@ function NavBar({
                 href="#"
                 onClick={e => { e.preventDefault(); document.getElementById('election')?.scrollIntoView({ behavior: 'smooth' }) }}
                 className="text-sm font-semibold tracking-wide transition-all duration-200 flex items-center gap-2 px-3 py-1"
-                style={{ color: '#c41230', fontFamily: 'var(--font-body)', border: '1px solid rgba(196,18,48,0.5)', animation: 'pulse 2s infinite' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(196,18,48,0.1)' }}
+                style={{
+                  color: activeElection.status === 'active' ? '#c41230' : '#c9a227',
+                  fontFamily: 'var(--font-body)',
+                  border: `1px solid ${activeElection.status === 'active' ? 'rgba(196,18,48,0.5)' : 'rgba(201,162,39,0.5)'}`,
+                  animation: activeElection.status === 'active' ? 'pulse 2s infinite' : 'none',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = activeElection.status === 'active' ? 'rgba(196,18,48,0.1)' : 'rgba(201,162,39,0.1)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#c41230', display: 'inline-block' }} />
-                Election Live
+                {activeElection.status === 'active' && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#c41230', display: 'inline-block' }} />}
+                {activeElection.status === 'active' ? 'Election Live' : 'Election Called'}
               </a>
             </li>
           )}
@@ -881,7 +893,7 @@ function NavBar({
         <div className="hidden md:flex items-center gap-3">
           {!loading && (
             session
-              ? <UserMenu session={session} signOut={signOut} isAdmin={isAdmin} onPartiesChanged={onPartiesChanged} onElectionChanged={onElectionChanged} />
+              ? <UserMenu session={session} signOut={signOut} isAdmin={isAdmin} onPartiesChanged={onPartiesChanged} onElectionChanged={onElectionChanged} onDismissElection={onDismissElection} />
               : (
                 <button
                   onClick={signInWithDiscord}
@@ -2131,7 +2143,7 @@ function ElectionPage({ election, session, parties }: { election: Election; sess
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {!isOver && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#c41230', boxShadow: '0 0 8px #c41230', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />}
             <div>
-              <div style={{ fontSize: 10, letterSpacing: '0.3em', color: isOver ? '#6a80b0' : '#c41230', textTransform: 'uppercase', fontWeight: 700, ...col }}>
+              <div style={{ fontSize: 10, letterSpacing: '0.3em', color: isOver ? '#c9a227' : '#c41230', textTransform: 'uppercase', fontWeight: 700, ...col }}>
                 {isOver ? (election.status === 'called' ? 'Election Called' : 'Election Closed') : 'Live Election'}
               </div>
               <div style={{ fontSize: 20, fontWeight: 800, color: '#f0f4ff', fontFamily: 'var(--font-display)' }}>{election.name}</div>
@@ -2826,6 +2838,7 @@ export default function App() {
   const [parties, setParties] = useState<Party[]>([])
   const [partiesLoading, setPartiesLoading] = useState(true)
   const [activeElection, setActiveElection] = useState<Election | null>(null)
+  const [dismissedElectionId, setDismissedElectionId] = useState<string | null>(null)
 
   const loadParties = () => {
     setPartiesLoading(true)
@@ -2867,11 +2880,11 @@ export default function App() {
 
   return (
     <div style={{ background: '#0a1a50' }}>
-      <NavBar scrolled={scrolled} activeSection={activeSection} session={session} loading={loading} isAdmin={isAdmin} signInWithDiscord={signInWithDiscord} signOut={signOut} onPartiesChanged={loadParties} activeElection={activeElection} onElectionChanged={loadActiveElection} />
+      <NavBar scrolled={scrolled} activeSection={activeSection} session={session} loading={loading} isAdmin={isAdmin} signInWithDiscord={signInWithDiscord} signOut={signOut} onPartiesChanged={loadParties} activeElection={activeElection && activeElection.id !== dismissedElectionId ? activeElection : null} onElectionChanged={loadActiveElection} onDismissElection={setDismissedElectionId} />
       <Hero />
       <Institutions />
       <Parties parties={parties} loading={partiesLoading} />
-      {activeElection && <ElectionPage election={activeElection} session={session} parties={parties} />}
+      {activeElection && activeElection.id !== dismissedElectionId && <ElectionPage election={activeElection} session={session} parties={parties} />}
       <ApprovalPage parties={parties} isAdmin={isAdmin} />
       <ConstitutionPage />
       <PoliticiansSection />
