@@ -844,6 +844,7 @@ function NavBar({
             { label: 'Parties', href: '#parties', id: 'parties' },
             { label: 'Approval', href: '#approval', id: 'approval' },
             { label: 'Constitution', href: '#constitution', id: 'constitution' },
+            { label: 'Politicians', href: '#politicians', id: 'politicians' },
             { label: 'About', href: '#about', id: 'about' },
           ].map((item) => {
             const isActive = activeSection === item.id
@@ -2283,6 +2284,128 @@ function ConstitutionPage() {
   )
 }
 
+type Politician = { discord_id: string; username: string; display_name: string | null; avatar_url: string | null; roles: string[] }
+
+const ROLE_ORDER = ['Founder', 'Prime Minister', 'Deputy Prime Minister', 'Foreign Secretary', 'Minister of Defence', 'Minister of Environmental Affairs', 'Cabinet Minister', 'Member of Parliament', 'Speaker', 'High Court Judge']
+const ROLE_COLOURS: Record<string, string> = {
+  'Founder': '#c9a227',
+  'Prime Minister': '#c41230',
+  'Deputy Prime Minister': '#c41230',
+  'Speaker': '#7b5ea7',
+  'Cabinet Minister': '#2e7ab5',
+  'Foreign Secretary': '#2e7ab5',
+  'Minister of Defense': '#2e7ab5',
+  'Minister of Environment': '#2e9e6b',
+  'Member of Parliament': '#4a8f6f',
+  'High Court Judge': '#8b7355',
+}
+
+function PoliticiansSection() {
+  const [politicians, setPoliticians] = useState<Politician[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('All')
+
+  const fetchPoliticians = () => {
+    setLoading(true)
+    supabase.from('anderside_politicians').select('*').order('username').then(({ data, error }) => {
+      if (error) console.error('Politicians fetch error:', error.message)
+      setPoliticians((data ?? []) as Politician[])
+      setLoading(false)
+    })
+  }
+
+  useEffect(() => {
+    fetchPoliticians()
+    // Re-fetch every 60 seconds so role changes appear without a page reload
+    const interval = setInterval(fetchPoliticians, 60_000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const allRoles = ['All', ...ROLE_ORDER.filter(r => politicians.some(p => p.roles.includes(r)))]
+  const filtered = (filter === 'All' ? politicians : politicians.filter(p => p.roles.includes(filter)))
+    .slice()
+    .sort((a, b) => {
+      const ai = ROLE_ORDER.findIndex(r => a.roles.includes(r))
+      const bi = ROLE_ORDER.findIndex(r => b.roles.includes(r))
+      if (ai !== bi) return ai - bi
+      return (a.display_name ?? a.username).localeCompare(b.display_name ?? b.username)
+    })
+
+  const primaryRole = (p: Politician) => ROLE_ORDER.find(r => p.roles.includes(r)) ?? p.roles[0] ?? ''
+
+  return (
+    <section id="politicians" style={{ background: '#060f30', paddingTop: 72, paddingBottom: 72 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.4em', color: '#c9a227', fontFamily: 'var(--font-body)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 12 }}>
+            Government & Parliament
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 800, color: '#f0f4ff', marginBottom: 0, lineHeight: 1.1 }}>
+            Politicians of Anderside
+          </h2>
+        </div>
+
+        {/* Role filter pills */}
+        {!loading && allRoles.length > 1 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 40 }}>
+            {allRoles.map(role => (
+              <button key={role} onClick={() => setFilter(role)} style={{
+                padding: '5px 14px', fontSize: 11, fontFamily: 'var(--font-body)', fontWeight: 600, letterSpacing: '0.1em',
+                cursor: 'pointer', border: `1px solid ${filter === role ? (ROLE_COLOURS[role] ?? '#c9a227') : 'rgba(201,162,39,0.2)'}`,
+                background: filter === role ? `${(ROLE_COLOURS[role] ?? '#c9a227')}18` : 'transparent',
+                color: filter === role ? (ROLE_COLOURS[role] ?? '#c9a227') : '#6a80b0',
+                textTransform: role === 'All' ? 'uppercase' : 'none',
+              }}>
+                {role}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ textAlign: 'center', color: '#3d4f70', fontFamily: 'var(--font-body)', fontSize: 13, padding: 48 }}>Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#3d4f70', fontFamily: 'var(--font-body)', fontSize: 13, padding: 48 }}>
+            No politicians found. Make sure the bot is running.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+            {filtered.map(p => {
+              const role = primaryRole(p)
+              const colour = ROLE_COLOURS[role] ?? '#6a80b0'
+              return (
+                <div key={p.discord_id} style={{ background: '#0a1a50', border: '1px solid rgba(201,162,39,0.12)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '28px 16px 20px', gap: 12, position: 'relative', overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: colour }} />
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt={p.display_name ?? p.username} style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: `2px solid ${colour}` }} />
+                  ) : (
+                    <div style={{ width: 72, height: 72, borderRadius: '50%', background: colour + '30', border: `2px solid ${colour}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 700, color: colour, fontFamily: 'var(--font-display)' }}>
+                      {(p.display_name ?? p.username)[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#f0f4ff', fontFamily: 'var(--font-display)', marginBottom: 4 }}>
+                      {p.display_name ?? p.username}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#6a80b0', fontFamily: 'var(--font-body)', marginBottom: 8 }}>@{p.username}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
+                      {p.roles.map(r => (
+                        <span key={r} style={{ fontSize: 9, padding: '2px 7px', background: `${ROLE_COLOURS[r] ?? '#6a80b0'}18`, color: ROLE_COLOURS[r] ?? '#6a80b0', border: `1px solid ${ROLE_COLOURS[r] ?? '#6a80b0'}40`, fontFamily: 'var(--font-body)', fontWeight: 600, letterSpacing: '0.05em' }}>
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function About() {
   return (
     <section
@@ -2517,7 +2640,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const ids = ['parliament', 'court', 'parties', 'approval', 'constitution', 'about', 'join']
+    const ids = ['parliament', 'court', 'parties', 'approval', 'constitution', 'politicians', 'about', 'join']
     const onScroll = () => {
       const mid = window.innerHeight * 0.4
       let current = ''
@@ -2544,6 +2667,7 @@ export default function App() {
       {activeElection && <ElectionPage election={activeElection} session={session} parties={parties} />}
       <ApprovalPage parties={parties} isAdmin={isAdmin} />
       <ConstitutionPage />
+      <PoliticiansSection />
       <About />
       <JoinSection session={session} signInWithDiscord={signInWithDiscord} />
       <Footer />
