@@ -1966,7 +1966,7 @@ function ElectionMap({ results, seatAssignment }: { results: VoteResult[]; seatA
       ctx.fillRect(0, 0, W, H)
       ctx.drawImage(off, 0, 0)
     }
-  }, [seatAssignment, colorMap, JSON.stringify(seeds)])
+  }, [JSON.stringify(seatAssignment), JSON.stringify(colorMap), JSON.stringify(seeds)])
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
