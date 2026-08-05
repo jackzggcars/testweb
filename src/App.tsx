@@ -6,7 +6,7 @@ import electionMapSrc from '@/imports/electionmap-1.png'
 import { supabase } from './supabaseClient'
 import { checkAdmin, getAdmins, addAdmin, removeAdmin, type AdminEntry } from './adminApi'
 import { getParties, createParty, updateParty, deleteParty, type Party } from './partyApi'
-import { getActiveElection, getAllElections, startElection, closeElection, castVote, removeVote, getUserVote, getResults, type Election, type VoteResult } from './electionApi'
+import { getActiveElection, getAllElections, startElection, closeElection, dismissElection, castVote, removeVote, getUserVote, getResults, type Election, type VoteResult } from './electionApi'
 
 // Handles the OAuth redirect callback on page load
 async function handleAuthCallback() {
@@ -2838,7 +2838,11 @@ export default function App() {
   const [parties, setParties] = useState<Party[]>([])
   const [partiesLoading, setPartiesLoading] = useState(true)
   const [activeElection, setActiveElection] = useState<Election | null>(null)
-  const [dismissedElectionId, setDismissedElectionId] = useState<string | null>(null)
+
+  const handleDismissElection = async (id: string) => {
+    await dismissElection(id)
+    setActiveElection(e => e?.id === id ? null : e)
+  }
 
   const loadParties = () => {
     setPartiesLoading(true)
@@ -2880,11 +2884,11 @@ export default function App() {
 
   return (
     <div style={{ background: '#0a1a50' }}>
-      <NavBar scrolled={scrolled} activeSection={activeSection} session={session} loading={loading} isAdmin={isAdmin} signInWithDiscord={signInWithDiscord} signOut={signOut} onPartiesChanged={loadParties} activeElection={activeElection && activeElection.id !== dismissedElectionId ? activeElection : null} onElectionChanged={loadActiveElection} onDismissElection={setDismissedElectionId} />
+      <NavBar scrolled={scrolled} activeSection={activeSection} session={session} loading={loading} isAdmin={isAdmin} signInWithDiscord={signInWithDiscord} signOut={signOut} onPartiesChanged={loadParties} activeElection={activeElection} onElectionChanged={loadActiveElection} onDismissElection={handleDismissElection} />
       <Hero />
       <Institutions />
       <Parties parties={parties} loading={partiesLoading} />
-      {activeElection && activeElection.id !== dismissedElectionId && <ElectionPage election={activeElection} session={session} parties={parties} />}
+      {activeElection && <ElectionPage election={activeElection} session={session} parties={parties} />}
       <ApprovalPage parties={parties} isAdmin={isAdmin} />
       <ConstitutionPage />
       <PoliticiansSection />

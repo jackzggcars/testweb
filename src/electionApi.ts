@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient'
 export type Election = {
   id: string
   name: string
-  status: 'active' | 'closed' | 'called'
+  status: 'active' | 'closed' | 'called' | 'dismissed'
   started_at: string
   ends_at: string
 }
@@ -21,10 +21,19 @@ export async function getActiveElection(): Promise<Election | null> {
   const { data } = await supabase
     .from('anderside_elections')
     .select('*')
+    .neq('status', 'dismissed')
     .order('started_at', { ascending: false })
     .limit(1)
     .maybeSingle()
   return data ?? null
+}
+
+export async function dismissElection(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('anderside_elections')
+    .update({ status: 'dismissed' })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 export async function getAllElections(): Promise<Election[]> {
