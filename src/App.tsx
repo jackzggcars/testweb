@@ -2197,92 +2197,220 @@ function ElectionPage({ election, session, parties }: { election: Election; sess
         </div>
       </div>
 
-      {/* ── Main 3-col ── */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '210px 1fr 210px', minHeight: 560 }}>
+      {isOver ? (
+        /* ── RESULTS VIEW ── */
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px 64px' }}>
 
-        {/* Left: parties + vote */}
-        <div style={{ borderRight: '1px solid rgba(255,255,255,0.05)', padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, ...col, marginBottom: 4 }}>Cast Your Vote</div>
-
-          {!session && !isOver && (
-            <div style={{ fontSize: 11, color: '#c9a227', border: '1px solid rgba(201,162,39,0.25)', padding: '8px 10px', marginBottom: 4, ...col }}>
-              Sign in with Discord to vote
+          {/* Winner banner */}
+          {p1 && p1Seats > 0 && (
+            <div style={{ margin: '36px 0 32px', textAlign: 'center' }}>
+              <div style={{ fontSize: 10, letterSpacing: '0.4em', color: '#c9a227', fontWeight: 700, ...col, textTransform: 'uppercase', marginBottom: 10 }}>
+                {p1Seats >= MAJORITY ? 'Majority Government Formed' : 'Largest Party — Minority Government'}
+              </div>
+              <div style={{ display: 'inline-block', border: `2px solid ${p1.color}`, padding: '18px 40px', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)', width: 8, height: 8, background: p1.color, marginTop: -4, rotate: '45deg' }} />
+                <div style={{ fontSize: 11, color: p1.color, fontWeight: 700, ...col, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 4 }}>{p1.name}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 56, fontWeight: 900, color: '#f0f4ff', lineHeight: 1 }}>{p1.abbr}</div>
+                <div style={{ display: 'flex', gap: 28, justifyContent: 'center', marginTop: 10 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: p1.color, fontFamily: 'var(--font-display)' }}>{p1Seats}</div>
+                    <div style={{ fontSize: 10, color: '#6a80b0', ...col, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Seats</div>
+                  </div>
+                  <div style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: p1.color, fontFamily: 'var(--font-display)' }}>{p1.percentage}%</div>
+                    <div style={{ fontSize: 10, color: '#6a80b0', ...col, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Vote Share</div>
+                  </div>
+                  <div style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: p1.color, fontFamily: 'var(--font-display)' }}>{p1.votes}</div>
+                    <div style={{ fontSize: 10, color: '#6a80b0', ...col, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Votes</div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
-          {error && <div style={{ fontSize: 11, color: '#c41230', marginBottom: 4, ...col }}>{error}</div>}
 
-          {partyData.map(party => {
-            const isMyVote = userVote === party.id
-            const canVote = !!(session && !hasVoted && !isOver && !voting)
-            return (
-              <div key={party.id}
-                onClick={() => canVote && handleVote(party.id)}
-                style={{
-                  padding: '10px 10px', border: `1px solid ${isMyVote ? party.color : 'rgba(255,255,255,0.06)'}`,
-                  background: isMyVote ? `${party.color}18` : 'rgba(255,255,255,0.015)',
-                  cursor: canVote ? 'pointer' : 'default', transition: 'border-color 0.15s, background 0.15s',
-                }}
-                onMouseEnter={e => { if (canVote) e.currentTarget.style.borderColor = party.color }}
-                onMouseLeave={e => { if (!isMyVote) e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 12, height: 12, background: party.color, borderRadius: 2, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#f0f4ff', ...col }}>{party.abbr}</div>
-                    <div style={{ fontSize: 10, color: '#6a80b0', ...col, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{party.name}</div>
+          {/* Map + party breakdown side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 32, alignItems: 'start', marginBottom: 40 }}>
+
+            {/* Map */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', padding: 4 }}>
+              <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, ...col, padding: '10px 12px 6px' }}>Constituency Map</div>
+              <ElectionMap results={results} seatAssignment={seatAssignment} />
+            </div>
+
+            {/* Full party breakdown */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, ...col, marginBottom: 14 }}>Full Results</div>
+              {partyData.map((party, i) => {
+                const seatPct = (party.seats / TOTAL_SEATS) * 100
+                const isWinner = i === 0 && party.seats > 0
+                return (
+                  <div key={party.id} style={{
+                    padding: '14px 0', borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    borderLeft: isWinner ? `3px solid ${party.color}` : '3px solid transparent',
+                    paddingLeft: isWinner ? 12 : 0,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: '#3d4f70', ...col, width: 14 }}>#{i + 1}</span>
+                        <div style={{ width: 11, height: 11, background: party.color, borderRadius: 2 }} />
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#f0f4ff', ...col }}>{party.abbr}</div>
+                          <div style={{ fontSize: 10, color: '#6a80b0', ...col }}>{party.name}</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 26, fontWeight: 900, color: party.seats > 0 ? party.color : '#3d4f70', fontFamily: 'var(--font-display)', lineHeight: 1 }}>{party.seats}</div>
+                        <div style={{ fontSize: 9, color: '#6a80b0', ...col }}>seats</div>
+                      </div>
+                    </div>
+                    {/* Seat bar */}
+                    <div style={{ height: 4, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
+                      <div style={{ height: '100%', width: `${seatPct}%`, background: party.color, transition: 'width 0.7s ease' }} />
+                    </div>
+                    {/* Vote bar */}
+                    <div style={{ height: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 2, overflow: 'hidden', marginBottom: 5 }}>
+                      <div style={{ height: '100%', width: `${party.percentage}%`, background: party.color, opacity: 0.5 }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 10, color: '#6a80b0', ...col }}>{party.votes} votes</span>
+                      <span style={{ fontSize: 10, color: party.percentage > 0 ? '#b8c4e8' : '#3d4f70', fontWeight: 600, ...col }}>{party.percentage}% vote share</span>
+                    </div>
                   </div>
-                  {canVote && <div style={{ fontSize: 10, color: '#c9a227', border: '1px solid rgba(201,162,39,0.3)', padding: '2px 6px', flexShrink: 0, ...col }}>Vote</div>}
-                  {!canVote && !isOver && hasVoted && !isMyVote && (
-                    <div style={{ fontSize: 10, color: '#3d4f70', ...col }}>—</div>
-                  )}
-                </div>
-                {isMyVote && (
-                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 10, color: party.color, ...col }}>✓ Your vote</span>
-                    <button onClick={e => { e.stopPropagation(); handleUncast() }} disabled={voting}
-                      style={{ fontSize: 10, color: '#c41230', background: 'none', border: 'none', cursor: 'pointer', ...col, padding: 0 }}>
-                      Uncast
-                    </button>
-                  </div>
-                )}
+                )
+              })}
+              <div style={{ paddingTop: 12, display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, color: '#3d4f70', ...col }}>Total votes cast: <span style={{ color: '#6a80b0' }}>{totalVotes}</span></span>
+                <span style={{ fontSize: 10, color: '#3d4f70', ...col }}>Majority: <span style={{ color: '#c9a227' }}>{MAJORITY}</span> / {TOTAL_SEATS}</span>
               </div>
-            )
-          })}
-        </div>
-
-        {/* Centre: map */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 12px' }}>
-          <ElectionMap results={results} seatAssignment={seatAssignment} />
-        </div>
-
-        {/* Right: standings */}
-        <div style={{ borderLeft: '1px solid rgba(255,255,255,0.05)', padding: '18px 14px' }}>
-          <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, ...col, marginBottom: 12 }}>Seat Standings</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {partyData.map((party, i) => (
-              <div key={party.id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 10, color: '#3d4f70', ...col, width: 12 }}>{i + 1}</span>
-                    <div style={{ width: 10, height: 10, background: party.color, borderRadius: 2, flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: '#c8d4f0', ...col, fontWeight: 600 }}>{party.abbr}</span>
-                  </div>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: party.seats > 0 ? party.color : '#3d4f70', fontFamily: 'var(--font-display)', transition: 'color 0.4s' }}>{party.seats}</span>
-                </div>
-                <div style={{ height: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${(party.seats / TOTAL_SEATS) * 100}%`, background: party.color, transition: 'width 0.7s ease' }} />
-                </div>
-                <div style={{ fontSize: 10, color: '#6a80b0', ...col, marginTop: 3 }}>{party.votes} votes · {party.percentage}%</div>
-              </div>
-            ))}
+            </div>
           </div>
-          <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: '#3d4f70', ...col }}>
-              Majority: <span style={{ color: '#c9a227' }}>{MAJORITY}</span> · Total: {TOTAL_SEATS} seats
+
+          {/* Constituency breakdown table */}
+          <div style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, ...col }}>Constituency Breakdown</div>
+              <div style={{ fontSize: 10, color: '#3d4f70', ...col }}>{CONSTITUENCIES.length} constituencies</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+              {CONSTITUENCIES.map((c, i) => {
+                const winnerPid = seatAssignment[i]
+                const winner = partyData.find(p => p.id === winnerPid)
+                return (
+                  <div key={c.name} style={{ padding: '12px 16px', borderRight: '1px solid rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#c8d4f0', ...col }}>{c.name}</div>
+                      {winner ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                          <div style={{ width: 7, height: 7, background: winner.color, borderRadius: 1 }} />
+                          <span style={{ fontSize: 10, color: winner.color, fontWeight: 700, ...col }}>{winner.abbr}</span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 10, color: '#3d4f70', ...col, marginTop: 3 }}>No result</div>
+                      )}
+                    </div>
+                    {winner && (
+                      <div style={{ fontSize: 10, color: '#6a80b0', ...col, textAlign: 'right' }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: winner.color, fontFamily: 'var(--font-display)', lineHeight: 1 }}>{winner.percentage}%</div>
+                        <div style={{ fontSize: 9, color: '#3d4f70', ...col }}>vote share</div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* ── LIVE VOTING VIEW ── */
+        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '210px 1fr 210px', minHeight: 560 }}>
+
+          {/* Left: parties + vote */}
+          <div style={{ borderRight: '1px solid rgba(255,255,255,0.05)', padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, ...col, marginBottom: 4 }}>Cast Your Vote</div>
+
+            {!session && !isOver && (
+              <div style={{ fontSize: 11, color: '#c9a227', border: '1px solid rgba(201,162,39,0.25)', padding: '8px 10px', marginBottom: 4, ...col }}>
+                Sign in with Discord to vote
+              </div>
+            )}
+            {error && <div style={{ fontSize: 11, color: '#c41230', marginBottom: 4, ...col }}>{error}</div>}
+
+            {partyData.map(party => {
+              const isMyVote = userVote === party.id
+              const canVote = !!(session && !hasVoted && !isOver && !voting)
+              return (
+                <div key={party.id}
+                  onClick={() => canVote && handleVote(party.id)}
+                  style={{
+                    padding: '10px 10px', border: `1px solid ${isMyVote ? party.color : 'rgba(255,255,255,0.06)'}`,
+                    background: isMyVote ? `${party.color}18` : 'rgba(255,255,255,0.015)',
+                    cursor: canVote ? 'pointer' : 'default', transition: 'border-color 0.15s, background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (canVote) e.currentTarget.style.borderColor = party.color }}
+                  onMouseLeave={e => { if (!isMyVote) e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 12, height: 12, background: party.color, borderRadius: 2, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#f0f4ff', ...col }}>{party.abbr}</div>
+                      <div style={{ fontSize: 10, color: '#6a80b0', ...col, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{party.name}</div>
+                    </div>
+                    {canVote && <div style={{ fontSize: 10, color: '#c9a227', border: '1px solid rgba(201,162,39,0.3)', padding: '2px 6px', flexShrink: 0, ...col }}>Vote</div>}
+                    {!canVote && !isOver && hasVoted && !isMyVote && (
+                      <div style={{ fontSize: 10, color: '#3d4f70', ...col }}>—</div>
+                    )}
+                  </div>
+                  {isMyVote && (
+                    <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 10, color: party.color, ...col }}>✓ Your vote</span>
+                      <button onClick={e => { e.stopPropagation(); handleUncast() }} disabled={voting}
+                        style={{ fontSize: 10, color: '#c41230', background: 'none', border: 'none', cursor: 'pointer', ...col, padding: 0 }}>
+                        Uncast
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Centre: map */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 12px' }}>
+            <ElectionMap results={results} seatAssignment={seatAssignment} />
+          </div>
+
+          {/* Right: standings */}
+          <div style={{ borderLeft: '1px solid rgba(255,255,255,0.05)', padding: '18px 14px' }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, ...col, marginBottom: 12 }}>Seat Standings</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {partyData.map((party, i) => (
+                <div key={party.id}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10, color: '#3d4f70', ...col, width: 12 }}>{i + 1}</span>
+                      <div style={{ width: 10, height: 10, background: party.color, borderRadius: 2, flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, color: '#c8d4f0', ...col, fontWeight: 600 }}>{party.abbr}</span>
+                    </div>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: party.seats > 0 ? party.color : '#3d4f70', fontFamily: 'var(--font-display)', transition: 'color 0.4s' }}>{party.seats}</span>
+                  </div>
+                  <div style={{ height: 3, background: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${(party.seats / TOTAL_SEATS) * 100}%`, background: party.color, transition: 'width 0.7s ease' }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: '#6a80b0', ...col, marginTop: 3 }}>{party.votes} votes · {party.percentage}%</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: '#3d4f70', ...col }}>
+                Majority: <span style={{ color: '#c9a227' }}>{MAJORITY}</span> · Total: {TOTAL_SEATS} seats
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
