@@ -929,26 +929,54 @@ function NavBar({
 
       {menuOpen && (
         <div
-          className="md:hidden px-6 pb-4 pt-2 flex flex-col gap-4"
+          className="md:hidden px-6 pb-5 pt-2 flex flex-col gap-1"
           style={{ background: 'rgba(10,26,80,0.98)', borderTop: '1px solid rgba(196,18,48,0.25)' }}
         >
           {[
-            { label: 'Parliament', href: '#parliament' },
-            { label: 'High Court', href: '#court' },
-            { label: 'Parties', href: '#parties' },
-            { label: 'About', href: '#about' },
-            { label: 'Join Discord', href: '#join' },
-          ].map((item) => (
+            { label: 'Parliament', href: '#parliament', id: 'parliament' },
+            { label: 'High Court', href: '#court', id: 'court' },
+            { label: 'Parties', href: '#parties', id: 'parties' },
+            { label: 'Approval', href: '#approval', id: 'approval' },
+            { label: 'Constitution', href: '#constitution', id: 'constitution' },
+            { label: 'Politicians', href: '#politicians', id: 'politicians' },
+            { label: 'About', href: '#about', id: 'about' },
+            { label: 'Join Discord', href: '#join', id: 'join' },
+          ].map((item) => {
+            const isActive = activeSection === item.id
+            return (
+              <a
+                key={item.label}
+                href={item.href}
+                className="text-sm font-medium py-2"
+                style={{
+                  color: isActive ? '#c9a227' : '#b8c4e8',
+                  fontFamily: 'var(--font-body)',
+                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                  borderLeft: isActive ? '3px solid #c9a227' : '3px solid transparent',
+                  paddingLeft: 10,
+                }}
+                onClick={() => setMenuOpen(false)}
+              >
+                {item.label}
+              </a>
+            )
+          })}
+          {activeElection && (
             <a
-              key={item.label}
-              href={item.href}
-              className="text-sm font-medium py-1"
-              style={{ color: '#b8c4e8', fontFamily: 'var(--font-body)' }}
-              onClick={() => setMenuOpen(false)}
+              href="#"
+              onClick={e => { e.preventDefault(); setMenuOpen(false); document.getElementById('election')?.scrollIntoView({ behavior: 'smooth' }) }}
+              className="text-sm font-semibold py-2 flex items-center gap-2"
+              style={{
+                color: activeElection.status === 'active' ? '#c41230' : '#c9a227',
+                fontFamily: 'var(--font-body)',
+                borderLeft: `3px solid ${activeElection.status === 'active' ? '#c41230' : '#c9a227'}`,
+                paddingLeft: 10,
+              }}
             >
-              {item.label}
+              {activeElection.status === 'active' && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#c41230', display: 'inline-block', flexShrink: 0 }} />}
+              {activeElection.status === 'active' ? 'Election Live' : 'Election Called'}
             </a>
-          ))}
+          )}
         </div>
       )}
     </nav>
