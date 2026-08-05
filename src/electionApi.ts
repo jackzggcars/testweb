@@ -18,14 +18,23 @@ export type VoteResult = {
 }
 
 export async function getActiveElection(): Promise<Election | null> {
-  const { data } = await supabase
+  // Return active election first; if none, return the most recent closed/called one for results display
+  const { data: active } = await supabase
     .from('anderside_elections')
     .select('*')
     .eq('status', 'active')
     .order('started_at', { ascending: false })
     .limit(1)
     .maybeSingle()
-  return data ?? null
+  if (active) return active
+  const { data: recent } = await supabase
+    .from('anderside_elections')
+    .select('*')
+    .in('status', ['called', 'closed'])
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return recent ?? null
 }
 
 export async function getAllElections(): Promise<Election[]> {
