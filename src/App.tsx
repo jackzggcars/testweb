@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import symbol from '@/imports/symbool.png'
 import flag from '@/imports/Andersideflag.png'
@@ -1879,8 +1879,8 @@ function ElectionMap({ results, seatAssignment }: { results: VoteResult[]; seatA
 
   useEffect(() => { loadConstituencySeeds().then(setSeeds) }, [])
 
-  const colorMap = Object.fromEntries(results.map(r => [r.party_id, r.party_color]))
-  const partyMap = Object.fromEntries(results.map(r => [r.party_id, { abbr: r.party_abbr ?? r.party_id, color: r.party_color, pct: r.percentage }]))
+  const colorMap = useMemo(() => Object.fromEntries(results.map(r => [r.party_id, r.party_color])), [results])
+  const partyMap = useMemo(() => Object.fromEntries(results.map(r => [r.party_id, { abbr: r.party_abbr ?? r.party_id, color: r.party_color, pct: r.percentage }])), [results])
 
   useEffect(() => {
     const canvas = canvasRef.current
