@@ -1,0 +1,169 @@
+THE CONSTITUTION OF THE PARLIAMENTARY DEMOCRACY OF ANDERSIDE  
+
+
+ARTICLE 1 - THE FOUNDERS  
+
+
+Section 1 - Founders  
+The ONLY legitimate and officially recognized Founders acknowledged by the State of Anderside are:  
+- A. Willis  
+- A. Jones  
+- R. Alexander  
+- T. Bradford  
+- J. Pearce  
+
+
+Section 2 - Titles and Roles  
+All of the Founders listed above will hold the base title of "Founder." If they assume another role, such as Head of State, they will adopt the title associated with that role (e.g., "Prime Minister" or "Speaker of the House"). While they will still be recognized as Founders, their official title will reflect their current role.  
+
+
+Section 3 - Rules and Procedures  
+Founders are REQUIRED to always act in what they believe to be the best interests of Anderside. Any action taken by a Founder that they know will harm Anderside is considered "treason" by the State of Anderside. If this harmful action is readily apparent, it automatically triggers a parliamentary vote to exile the Founder from the server entirely. Founders will have an opportunity to defend themselves before Parliament, but the final decision will be made by Parliament.  
+
+
+When not acting in another capacity (such as a Parliament member or Speaker), Founders will function as "admins" for the server. They are responsible for addressing violations of the Terms of Service (TOS), including hate speech and inappropriate content, as outlined in Discord's TOS. The actions taken by Founders to enforce these measures are at their discretion and should be proportional to the violation.
+
+
+ARTICLE 2 - The Parliamentary Branch
+
+Section 1 - Legislative and Bill Voting Powers  
+All legislative powers are vested in the Parliament of Anderside. The Parliament has complete control over all pieces of legislation introduced.
+
+
+Section 2 - Legislation Procedures  
+All pieces of legislation submitted to Parliament are required to be addressed either through a parliamentary vote or by a referendum conducted among the entire server population to determine whether to pass or deny the legislation.
+
+
+When a piece of legislation is passed through either a parliamentary vote or a popular referendum, it must be officially signed into law by the Head of State (Prime Minister) who is in office at the time the bill is passed. The Prime Minister has the authority to override a bill that has been passed by parliamentary vote and choose not to sign it, preventing it from becoming law. However, the Prime Minister cannot override a decision made by a popular referendum. If the Prime Minister wishes to challenge a referendum result and not sign the bill into law, they may trigger another referendum. If this override referendum chooses to sign the bill into law, it is automatically enacted without the need for the Prime Minister’s signature. Conversely, if the override referendum decides against signing the bill, it is scrapped and can be reintroduced into the legislative process no sooner than one week later.
+
+Section 3 - The Speaker
+The speaker is the role of someone officially elected by parliament to maintain order, represent parliament, preside over debates, enforce the constitutionally set rules on parliament and acts as a tie breaker vote they vote last and vote to break a tie in parliament, to be elected as Speaker someone must be a Minister already and receive a majority vote, a new speaker is elected every month.
+
+Section 4 - Constitutional Amendments  
+To amend this constitution, Parliament must first draft and introduce the proposed legislation. Following this, a vote will be triggered, requiring a two-thirds majority for the amendment to pass.
+
+
+Section 5 - Emergency Legislation  
+In the event of an unforeseen situation that poses an immediate or significant threat to the security, stability, public safety, constitutional order, or the continued functioning of the Nation of Anderside, Parliament has the right, with a majority vote, to introduce legislation immediately to address or proactively prepare for this emergency.
+
+Section 6 - Seats and Control of Parliament consists of a total of 25 seats that can be held by various political parties. Each constituency is allocated one seat, and the party that secures the most constituencies will control the most seats.
+
+Section 7 - Impeachment
+Parliament shall have the power to impeach any elected or appointed public official of Anderside, including the Prime Minister, Cabinet Ministers, Members of Parliament, and Judges of the High Court, for treason, corruption, abuse of office, serious misconduct, or a substantial violation of this Constitution.
+Articles of Impeachment may be introduced by any Member of Parliament and shall require a two-thirds majority vote of Parliament to pass. Upon approval, the accused official shall be tried before the High Court, which shall determine whether the official shall be removed from office. A conviction shall require a unanimous decision of the High Court. Removal from office shall not prevent Parliament from imposing any additional penalties permitted under this Constitution or by law.
+
+
+
+ARTICLE 3 - The Head Of State And Cabinet
+
+Section 1 - Powers 
+The powers of the Head of State are vested in the Prime Minister of Anderside, who holds their office for a term of one month. Each person may serve a total of three terms.  
+
+
+What are the powers of the Head of State? The Head of State is not in full control of the nation. They have the power to appoint members of their cabinet to certain roles and to carry out specific tasks as they see fit. They can establish international relations, form alliances, and negotiate treaties; however, they are not allowed to join any unions but may refer a union to Parliament for a vote. They also have the authority to deploy military assets both nationally and internationally, but must notify Parliament within 24 hours of such deployments. This notification can either be for a military operation (whether prolonged or short-term) or to request a declaration of war, which must be voted on by Parliament.  
+
+
+Section 2 - Cabinet Buildup  
+A Prime Minister's cabinet may consist of twelve or fewer cabinet ministers at their discretion. There are no constitutionally mandated roles for these ministers; instead, their responsibilities are determined by the Prime Minister based on their individual strengths. For example, a cabinet minister may be designated as the Minister of Finance or hold another specific title. All cabinet ministers must hold a seat in Parliament.  
+
+
+Section 3 - Election Requirements  
+To stand in a general election for Head of State, a candidate must first be a citizen of Anderside and a member of Parliament. Additionally, they must be the leader of their respective party, as citizens vote for parties rather than individuals.  
+
+Section 4 - Electoral Defeat, Resignation, and Replacement 
+If a Prime Minister stands for re-election and is defeated, they are required by the constitution to leave office and transfer power to the next government within 24 hours of the election results being finalized. Failure to do so will be seen as an act of tyranny, and if Parliament recognizes it as such, they have the right to initiate a parliamentary vote to exile the Prime Minister from the server entirely.  
+
+
+If a Prime Minister wishes to resign for any reason, they must provide a letter of resignation to Parliament, explaining why they or their party can no longer continue their duties. Following this, they must address the public in a speech, where it is customary to briefly summarize the reasons provided in their resignation letter. After both steps are completed, the Prime Minister may either call for a general election to allow the country to choose a new Prime Minister and government party or delegate the selection of a new party leader to their party. When a new party leader is chosen, they will assume office and inherit the powers of the Head of State.  
+
+
+If a governing party has no confidence in their current party leader, any member of the party may initiate a vote of no confidence, which requires a majority approval to remove the leader. If a majority vote is achieved, it is the responsibility of the party to select a new party leader, who will then take over as Prime Minister.
+
+Section 5 - The Oath  
+After a party has been elected to govern, the leader of the party shall take the following oath: “I hereby swear allegiance to the Nation of Anderside and its people, pledging to uphold the Constitution and serve them faithfully.”
+
+
+ARTICLE 4 - Political Parties
+
+Section 1 - Creating a Party  
+To register a political party, it must have a logo, a party leader, and a prospective constituency. Once these requirements are met, candidates must register to stand for election in their selected constituency.
+
+
+Section 2 - Legislation and Bills  
+Both governing and opposition parties have the right to introduce legislation in Parliament. Each piece of legislation must have a name and a detailed description outlining its requirements and objectives for the nation.
+
+
+Section 3 - Party Members and Roles  
+There are three main roles within an Anderside Political Party:  
+1. Party Leader: This individual is either voted in by the party members or is the original creator of the party.  
+2. Party Minister: This member has previously been elected in a constituency and serves as a Minister in Parliament.  
+3. Party Member: New members are brought into the party to assist with elections, write legislation, and provide support when needed. They may also stand for election to become a Party Minister.
+
+
+Section 4 - Party Votes  
+Party votes to elect a leader are fully under the control of the party itself. The only requirement set forth by this constitution is that the voting process must be free and fair.
+
+Section 5 - Separation Of Church And State (As Per Separation Of State And Church Act)
+No political parties can operate a theocracy or protect one Religion over others.
+
+ARTICLE 5 - The Judiciary
+
+Section 1 - Judicial Power  
+The power to interpret the Constitution, resolve legal disputes, ensure that laws and legislation comply with the Constitution, and protect the rights of citizens is vested in the Courts of Anderside.
+
+
+Section 2 - The High Court  
+The High Court is currently the only and highest court in Anderside. It possesses all the powers listed in Section One, in addition to the authority to resolve disputes regarding votes and elections, as well as to try impeachment cases initiated by Parliament.
+
+Section 3 - Judicial Independence  
+Judges must remain politically neutral and are required to decide all cases based on the Constitution and/or the laws of Anderside.  
+
+
+Section 4 - Due Process  
+Every individual, whether a citizen or not, within Anderside has the right to a fair trial, the ability to present evidence, respond to accusations, and appeal decisions.
+
+Section 5 - Appointment  
+The Prime Minister shall appoint all Judges to the High Court. Alternatively, Parliament has the right to appoint Judges with a two-thirds majority vote.
+
+
+Section 6 - Removal  
+Judges can only be removed by a two-thirds majority vote from Parliament, following a finding of misconduct or incapacity.
+
+ARTICLE 6 - Rights Of Citizens
+
+Section 1 - Political Rights  
+Every Anderside citizen has the right to vote, the right to run for office, the right to join or create political parties, and the right to petition Parliament.  
+
+
+Section 2 - Civil Rights  
+Every citizen has the right to freedom of speech, except in cases of hate speech. Hate speech is defined in this constitution as any speech, writing, or behavior that intentionally attacks, degrades, or uses discriminatory language against a person or group based on inherent identity factors. Every citizen also has the right to freedom of expression, as long as it does not constitute hate speech as defined above. Additionally, every citizen has the right to protest peacefully. A protest is considered unpeaceful when someone is injured or the nation is harmed as a result.
+
+
+ARTICLE 7 - Elections
+
+Section 1 - General Elections
+A General Election shall be held once every calendar month unless Parliament has been dissolved earlier in accordance with this Constitution. During a General Election, eligible citizens shall vote for the political party they wish to form the Government of Anderside. The political party receiving the greatest number of seats in Parliament shall be invited to form the Government, and its Party Leader shall assume the office of Prime Minister.
+Section 2 - Eligibility to Vote
+Every citizen of Anderside has the right to vote in all General Elections, referendums, and any other national votes established under this Constitution. This right is granted as long as they have not been suspended from citizenship or voting rights in accordance with the laws of Anderside. Additionally, citizens who join after the start of an election are ineligible to vote in that election.
+Section 3 - Constituencies and Parliamentary Seats
+The Nation of Anderside shall be divided into twenty-five constituencies, each represented by one Member of Parliament. Elections within each constituency shall determine which candidate shall occupy that constituency's seat in Parliament until the next General Election.
+Section 4 - Election Administration
+The Speaker of Parliament shall oversee the administration of all General Elections and ensure that elections are conducted fairly, impartially, and in accordance with this Constitution. The Speaker may appoint Election Officers to assist in administering elections.
+Section 5 - Election Integrity
+Any attempt to manipulate, falsify, interfere with, or otherwise undermine the fairness of an election or referendum shall constitute Electoral Fraud. Allegations of Electoral Fraud shall be investigated by the High Court, which may declare an election void and order that a new election be held if sufficient evidence of misconduct is found.
+Section 6 - Election Results
+Following the conclusion of voting, the official election results shall be announced by the Speaker of Parliament. The outgoing Government shall peacefully transfer executive authority to the incoming Government within twenty-four hours of the official declaration of the results.
+Section 7 - By-Elections
+If a parliamentary seat becomes vacant before the next General Election due to resignation, removal, death, inactivity, or any other lawful reason, a By-Election shall be held within seven days to elect a new Member of Parliament for the affected constituency, unless Parliament has less than seven days remaining in its current term.
+
+Section 8 - Party Eligibility (As Per Clean Party Act)
+Political parties are ineligible to participate in any election if they utilize AI for their manifestos or advertisements. Every party must have an official manifesto to run in an election.
+
+
+Article 8 - The One Flag Amendment
+
+Section 1 - Flag Alteration
+As per this constitution, it is unconstitutional to alter or change in any way the national flag of Anderside.
+
+Section 2 - Flag Usage
+For all government flag purposes, officials and the nation must use the National Flag of Anderside; citizens not acting as government agents are fully within their rights to exercise freedom of expression and use any flag of their choice.

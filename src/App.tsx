@@ -507,75 +507,113 @@ function AdminPanelElections({ onElectionChanged }: { onElectionChanged: () => v
   )
 }
 
-function AdminPanelConstitution() {
-  const [content, setContent] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+type ConstitutionSection = { id: number; order_index: number; title: string; body: string; is_article: boolean }
 
-  useEffect(() => {
-    supabase.from('anderside_constitution').select('content').eq('id', 1).single().then(({ data }) => {
-      if (data?.content) setContent(data.content)
-      setLoading(false)
-    })
-  }, [])
+async function loadConstitutionSections(): Promise<ConstitutionSection[]> {
+  const { data } = await supabase.from('anderside_constitution_sections').select('*').order('order_index')
+  return (data ?? []) as ConstitutionSection[]
+}
+
+function AdminPanelConstitution() {
+  const [sections, setSections] = useState<ConstitutionSection[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<number | 'new' | null>(null)
+  const [editingId, setEditingId] = useState<number | 'new' | null>(null)
+  const [draft, setDraft] = useState({ title: '', body: '', is_article: false })
+
+  const reload = () => loadConstitutionSections().then(s => { setSections(s); setLoading(false) })
+  useEffect(() => { reload() }, [])
+
+  const startEdit = (s: ConstitutionSection) => { setEditingId(s.id); setDraft({ title: s.title, body: s.body, is_article: s.is_article }) }
+  const startNew = () => { setEditingId('new'); setDraft({ title: '', body: '', is_article: false }) }
+  const cancelEdit = () => { setEditingId(null); setDraft({ title: '', body: '', is_article: false }) }
 
   const handleSave = async () => {
-    setSaving(true)
-    await supabase.from('anderside_constitution').upsert({ id: 1, content })
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaving(editingId)
+    if (editingId === 'new') {
+      const maxOrder = sections.length ? Math.max(...sections.map(s => s.order_index)) + 1 : 0
+      await supabase.from('anderside_constitution_sections').insert({ title: draft.title, body: draft.body, is_article: draft.is_article, order_index: maxOrder })
+    } else {
+      await supabase.from('anderside_constitution_sections').update({ title: draft.title, body: draft.body, is_article: draft.is_article }).eq('id', editingId)
+    }
+    setSaving(null); setEditingId(null); reload()
   }
 
-  if (loading) return (
-    <div style={{ padding: 32, textAlign: 'center', color: '#3d4f70', fontFamily: 'var(--font-body)', fontSize: 13 }}>Loading…</div>
-  )
+  const handleDelete = async (id: number) => {
+    if (!confirm('Delete this section?')) return
+    await supabase.from('anderside_constitution_sections').delete().eq('id', id)
+    reload()
+  }
+
+  const handleMove = async (id: number, dir: -1 | 1) => {
+    const idx = sections.findIndex(s => s.id === id)
+    const swapIdx = idx + dir
+    if (swapIdx < 0 || swapIdx >= sections.length) return
+    const a = sections[idx], b = sections[swapIdx]
+    await supabase.from('anderside_constitution_sections').update({ order_index: b.order_index }).eq('id', a.id)
+    await supabase.from('anderside_constitution_sections').update({ order_index: a.order_index }).eq('id', b.id)
+    reload()
+  }
+
+  if (loading) return <div style={{ padding: 32, textAlign: 'center', color: '#3d4f70', fontFamily: 'var(--font-body)', fontSize: 13 }}>Loading…</div>
+
+  const inputStyle: React.CSSProperties = { width: '100%', background: '#060f30', border: '1px solid rgba(201,162,39,0.25)', color: '#c8d4f0', fontFamily: 'var(--font-body)', fontSize: 12, padding: '8px 10px', outline: 'none', boxSizing: 'border-box' }
+  const btnStyle = (primary?: boolean): React.CSSProperties => ({
+    padding: '6px 14px', fontSize: 10, fontFamily: 'var(--font-body)', fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', cursor: 'pointer',
+    background: primary ? '#c9a227' : 'transparent', color: primary ? '#050d28' : '#6a80b0',
+    border: `1px solid ${primary ? '#c9a227' : 'rgba(201,162,39,0.2)'}`,
+  })
 
   return (
-    <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontSize: 11, color: '#6a80b0', fontFamily: 'var(--font-body)', letterSpacing: '0.1em' }}>
-        Edit the full text of the Anderside Constitution. Supports markdown — use # for headings, ** for bold, * for italic.
-      </div>
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        rows={22}
-        style={{
-          width: '100%',
-          background: '#060f30',
-          border: '1px solid rgba(201,162,39,0.25)',
-          color: '#c8d4f0',
-          fontFamily: 'monospace',
-          fontSize: 12,
-          lineHeight: 1.6,
-          padding: '12px 14px',
-          resize: 'vertical',
-          outline: 'none',
-          boxSizing: 'border-box',
-        }}
-        placeholder="# Constitution of Anderside&#10;&#10;## Article I — ..."
-      />
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{
-            padding: '9px 24px',
-            background: saving ? 'rgba(201,162,39,0.2)' : '#c9a227',
-            color: saving ? '#c9a227' : '#050d28',
-            fontFamily: 'var(--font-body)',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            border: '1px solid #c9a227',
-            cursor: saving ? 'wait' : 'pointer',
-          }}
-        >
-          {saved ? '✓ Saved' : saving ? 'Saving…' : 'Save Constitution'}
-        </button>
-      </div>
+    <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {sections.map((s, idx) => (
+        <div key={s.id} style={{ border: '1px solid rgba(201,162,39,0.15)', background: '#060f30' }}>
+          {editingId === s.id ? (
+            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={draft.is_article} onChange={e => setDraft(d => ({ ...d, is_article: e.target.checked }))} />
+                <span style={{ fontSize: 11, color: '#c9a227', fontFamily: 'var(--font-body)' }}>Article heading (not a section)</span>
+              </label>
+              <input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder={draft.is_article ? 'Article title (e.g. ARTICLE 1 - THE FOUNDERS)' : 'Section title…'} style={inputStyle} />
+              <textarea value={draft.body} onChange={e => setDraft(d => ({ ...d, body: e.target.value }))} rows={draft.is_article ? 2 : 7} placeholder={draft.is_article ? 'Optional subtitle…' : 'Section body text…'} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }} />
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                <button style={btnStyle()} onClick={cancelEdit}>Cancel</button>
+                <button style={btnStyle(true)} onClick={handleSave} disabled={saving === s.id}>{saving === s.id ? 'Saving…' : 'Save'}</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#c9a227', fontFamily: 'var(--font-display)', marginBottom: 2 }}>{s.title || <span style={{ color: '#3d4f70', fontStyle: 'italic' }}>Untitled</span>}</div>
+                <div style={{ fontSize: 11, color: '#6a80b0', fontFamily: 'var(--font-body)', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: 60, overflow: 'hidden' }}>{s.body}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                <button onClick={() => handleMove(s.id, -1)} disabled={idx === 0} style={{ ...btnStyle(), padding: '4px 8px', opacity: idx === 0 ? 0.3 : 1 }}>↑</button>
+                <button onClick={() => handleMove(s.id, 1)} disabled={idx === sections.length - 1} style={{ ...btnStyle(), padding: '4px 8px', opacity: idx === sections.length - 1 ? 0.3 : 1 }}>↓</button>
+                <button onClick={() => startEdit(s)} style={btnStyle()}>Edit</button>
+                <button onClick={() => handleDelete(s.id)} style={{ ...btnStyle(), color: '#c41230', borderColor: 'rgba(196,18,48,0.3)' }}>✕</button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {editingId === 'new' ? (
+        <div style={{ border: '1px solid rgba(201,162,39,0.3)', background: '#060f30', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={draft.is_article} onChange={e => setDraft(d => ({ ...d, is_article: e.target.checked }))} />
+            <span style={{ fontSize: 11, color: '#c9a227', fontFamily: 'var(--font-body)' }}>Article heading (not a section)</span>
+          </label>
+          <input value={draft.title} onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder={draft.is_article ? 'Article title (e.g. ARTICLE 1 - THE FOUNDERS)' : 'Section title…'} style={inputStyle} />
+          <textarea value={draft.body} onChange={e => setDraft(d => ({ ...d, body: e.target.value }))} rows={draft.is_article ? 2 : 7} placeholder={draft.is_article ? 'Optional subtitle…' : 'Section body text…'} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }} />
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            <button style={btnStyle()} onClick={cancelEdit}>Cancel</button>
+            <button style={btnStyle(true)} onClick={handleSave} disabled={saving === 'new'}>{saving === 'new' ? 'Saving…' : 'Add Section'}</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={startNew} style={{ ...btnStyle(true), alignSelf: 'flex-start', padding: '8px 18px' }}>+ Add Section</button>
+      )}
     </div>
   )
 }
@@ -803,6 +841,7 @@ function NavBar({
             { label: 'High Court', href: '#court' },
             { label: 'Parties', href: '#parties' },
             { label: 'Approval', href: '#approval' },
+            { label: 'Constitution', href: '#constitution' },
             { label: 'About', href: '#about' },
           ].map((item) => (
             <li key={item.label}>
@@ -2163,6 +2202,82 @@ function ElectionPage({ election, session, parties }: { election: Election; sess
   )
 }
 
+function ConstitutionPage() {
+  const [sections, setSections] = useState<ConstitutionSection[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { loadConstitutionSections().then(s => { setSections(s); setLoading(false) }) }, [])
+
+  return (
+    <section id="constitution" style={{ background: 'linear-gradient(180deg, #050d28 0%, #060f30 100%)', paddingTop: 80, paddingBottom: 80 }}>
+      <div style={{ maxWidth: 820, margin: '0 auto', padding: '0 24px' }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 64 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.4em', color: '#c9a227', fontFamily: 'var(--font-body)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 16 }}>
+            Founding Document
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 400, color: '#6a80b0', letterSpacing: '0.25em', textTransform: 'uppercase', marginBottom: 16 }}>
+            The Constitution of the Parliamentary Democracy of
+          </h2>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 52, fontWeight: 900, color: '#f0f4ff', lineHeight: 1, marginBottom: 20, letterSpacing: '-0.02em' }}>
+            ANDERSIDE
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center' }}>
+            <div style={{ height: 1, width: 60, background: 'rgba(201,162,39,0.3)' }} />
+            <div style={{ width: 6, height: 6, background: '#c9a227', transform: 'rotate(45deg)' }} />
+            <div style={{ height: 1, width: 60, background: 'rgba(201,162,39,0.3)' }} />
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', color: '#3d4f70', fontFamily: 'var(--font-body)', fontSize: 13, padding: 48 }}>Loading…</div>
+        ) : sections.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#3d4f70', fontFamily: 'var(--font-body)', fontSize: 13, padding: 48 }}>
+            The constitution has not yet been published.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {sections.map((s) => s.is_article ? (
+              /* Article heading row */
+              <div key={s.id} style={{ marginTop: 52, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10 }}>
+                  <div style={{ height: 1, flex: 1, background: 'rgba(201,162,39,0.2)' }} />
+                  <span style={{ fontSize: 10, letterSpacing: '0.35em', color: '#c9a227', fontFamily: 'var(--font-body)', textTransform: 'uppercase', fontWeight: 700, flexShrink: 0 }}>
+                    {s.title}
+                  </span>
+                  <div style={{ height: 1, flex: 1, background: 'rgba(201,162,39,0.2)' }} />
+                </div>
+                {s.body ? (
+                  <p style={{ fontFamily: 'var(--font-body)', fontSize: 13, color: '#6a80b0', lineHeight: 1.7, textAlign: 'center', fontStyle: 'italic' }}>{s.body}</p>
+                ) : null}
+              </div>
+            ) : (
+              /* Section content row */
+              <div key={s.id} style={{ display: 'flex', gap: 24, paddingTop: 20, paddingBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ width: 3, flexShrink: 0, background: 'rgba(201,162,39,0.2)', borderRadius: 2, alignSelf: 'stretch', minHeight: 20 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#c9a227', fontFamily: 'var(--font-body)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 8 }}>
+                    {s.title}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-body)', fontSize: 14, color: '#8fa0cc', lineHeight: 1.9, whiteSpace: 'pre-wrap' }}>
+                    {s.body}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div style={{ marginTop: 56, paddingTop: 24, borderTop: '1px solid rgba(201,162,39,0.15)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ width: 6, height: 6, background: '#c9a227', transform: 'rotate(45deg)', margin: '0 auto' }} />
+              <span style={{ fontSize: 10, letterSpacing: '0.35em', color: '#3d4f70', fontFamily: 'var(--font-body)', textTransform: 'uppercase' }}>
+                End of Constitution
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function About() {
   return (
     <section
@@ -2402,6 +2517,7 @@ export default function App() {
       <Parties parties={parties} loading={partiesLoading} />
       {activeElection && <ElectionPage election={activeElection} session={session} parties={parties} />}
       <ApprovalPage parties={parties} isAdmin={isAdmin} />
+      <ConstitutionPage />
       <About />
       <JoinSection session={session} signInWithDiscord={signInWithDiscord} />
       <Footer />
