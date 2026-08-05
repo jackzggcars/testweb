@@ -2833,7 +2833,7 @@ export default function App() {
   }
 
   const loadActiveElection = () => {
-    getActiveElection().then((e) => setActiveElection(e)).catch(() => setActiveElection(null))
+    getActiveElection().then((e) => { if (e) setActiveElection(e) }).catch(() => {})
   }
 
   useEffect(() => { loadParties(); loadActiveElection() }, [])
