@@ -2948,9 +2948,23 @@ function StandingsPage() {
   const tooltipRef = useRef<HTMLDivElement>(null)
   const visibleRef = useRef(false)
 
-  useEffect(() => { loadStandings().then(setStandings) }, [])
+  useEffect(() => {
+    loadStandings().then(setStandings)
+    const interval = setInterval(() => loadStandings().then(setStandings), 5000)
+    return () => clearInterval(interval)
+  }, [])
 
-  const standingMap = useMemo(() => Object.fromEntries(standings.map(s => [s.country_code, s])), [standings])
+  // Key standings by ISO-A2 code for fast lookup
+  const standingMap = useMemo(() => Object.fromEntries(standings.map(s => [s.country_code.toUpperCase(), s])), [standings])
+  // Also build a numeric-keyed map using ISO_INFO so geo.id (numeric) works reliably
+  const standingMapByNum = useMemo(() => {
+    const m: Record<number, CountryStanding> = {}
+    for (const [numStr, [a2]] of Object.entries(ISO_INFO)) {
+      const s = standingMap[a2.toUpperCase()]
+      if (s) m[Number(numStr)] = s
+    }
+    return m
+  }, [standingMap])
 
   const handleContainerMouseMove = (e: React.MouseEvent) => {
     if (!tooltipRef.current || !visibleRef.current) return
@@ -3016,8 +3030,8 @@ function StandingsPage() {
                 <Geographies geography={GEO_URL}>
                   {({ geographies }) =>
                     geographies.map((geo) => {
-                      const code = geo.properties.ISO_A2 ?? geo.id
-                      const standing = standingMap[code]
+                      const geoNum = Number(geo.id)
+                      const standing = standingMapByNum[geoNum]
                       const fill = standing ? standingColor(standing.score) : NEUTRAL_COLOR
                       return (
                         <Geography
@@ -3032,7 +3046,7 @@ function StandingsPage() {
                             pressed: { outline: 'none', cursor: 'grabbing' },
                           }}
                           onMouseEnter={() => {
-                            const name = geo.properties.NAME ?? geo.properties.name ?? code
+                            const name = geo.properties.NAME ?? geo.properties.name ?? String(geo.id)
                             visibleRef.current = true
                             if (tooltipRef.current) tooltipRef.current.style.display = 'block'
                             setHoveredCountry({ country: standing ?? null, name, isNeutral: !standing, geoId: geo.id })
