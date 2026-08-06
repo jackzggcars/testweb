@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import symbol from '@/imports/symbool.png'
 import flag from '@/imports/Andersideflag.png'
 import electionMapSrc from '@/imports/electionmap-1.png'
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps'
 import { supabase } from './supabaseClient'
 import { checkAdmin, getAdmins, addAdmin, removeAdmin, type AdminEntry } from './adminApi'
 import { getParties, createParty, updateParty, deleteParty, type Party } from './partyApi'
@@ -519,6 +520,47 @@ async function loadConstitutionSections(): Promise<ConstitutionSection[]> {
   return (data ?? []) as ConstitutionSection[]
 }
 
+type CountryStanding = {
+  id?: number
+  country_code: string
+  country_name: string
+  score: number  // 0-100
+  notes: string
+  allies: string       // comma-separated country names
+  enemies: string      // comma-separated country names
+  in_nato: boolean
+  in_un: boolean
+}
+
+function standingLabel(score: number): string {
+  if (score >= 81) return 'Very Good'
+  if (score >= 61) return 'Good'
+  if (score >= 41) return 'Neutral'
+  if (score >= 21) return 'Bad'
+  return 'Very Bad'
+}
+
+function standingColor(score: number): string {
+  if (score >= 81) return '#c9a227'
+  if (score >= 61) return '#4a9f6f'
+  if (score >= 41) return '#6a80b0'
+  if (score >= 21) return '#e07020'
+  return '#c41230'
+}
+
+async function loadStandings(): Promise<CountryStanding[]> {
+  const { data } = await supabase.from('anderside_standings').select('*').order('country_name')
+  return data ?? []
+}
+
+async function saveStanding(s: CountryStanding): Promise<void> {
+  await supabase.from('anderside_standings').upsert({ ...s }, { onConflict: 'country_code' })
+}
+
+async function deleteStanding(country_code: string): Promise<void> {
+  await supabase.from('anderside_standings').delete().eq('country_code', country_code)
+}
+
 function AdminPanelConstitution() {
   const [sections, setSections] = useState<ConstitutionSection[]>([])
   const [loading, setLoading] = useState(true)
@@ -623,8 +665,166 @@ function AdminPanelConstitution() {
   )
 }
 
+function AdminPanelStandings() {
+  const [standings, setStandings] = useState<CountryStanding[]>([])
+  const [search, setSearch] = useState('')
+  const [editing, setEditing] = useState<CountryStanding | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { loadStandings().then(setStandings) }, [])
+
+  const refresh = () => loadStandings().then(setStandings)
+
+  const handleSave = async () => {
+    if (!editing) return
+    setSaving(true)
+    try {
+      await saveStanding(editing)
+      await refresh()
+      setEditing(null)
+    } finally { setSaving(false) }
+  }
+
+  const handleDelete = async (code: string) => {
+    await deleteStanding(code)
+    await refresh()
+    if (editing?.country_code === code) setEditing(null)
+  }
+
+  const filtered = standings.filter(s =>
+    s.country_name.toLowerCase().includes(search.toLowerCase()) ||
+    s.country_code.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const bodyFont = { fontFamily: 'var(--font-body)' }
+
+  return (
+    <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Add / Edit form */}
+      <div>
+        <div style={{ fontSize: 11, color: '#c9a227', textTransform: 'uppercase', letterSpacing: '0.2em', fontWeight: 600, marginBottom: 10, ...bodyFont }}>
+          {editing?.id ? 'Edit Standing' : 'Add Standing'}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <input
+              placeholder="Country code (e.g. GB)"
+              value={editing?.country_code ?? ''}
+              onChange={e => setEditing(v => ({ ...(v ?? { country_name: '', score: 50, notes: '', allies: '', enemies: '', in_nato: false, in_un: false }), country_code: e.target.value.toUpperCase() }))}
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', padding: '7px 10px', fontSize: 12, outline: 'none', ...bodyFont }}
+            />
+            <input
+              placeholder="Country name"
+              value={editing?.country_name ?? ''}
+              onChange={e => setEditing(v => ({ ...(v ?? { country_code: '', score: 50, notes: '', allies: '', enemies: '', in_nato: false, in_un: false }), country_name: e.target.value }))}
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', padding: '7px 10px', fontSize: 12, outline: 'none', ...bodyFont }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{ fontSize: 11, color: '#6a80b0', ...bodyFont, whiteSpace: 'nowrap' }}>Score: {editing?.score ?? 50}</label>
+            <input
+              type="range" min={0} max={100}
+              value={editing?.score ?? 50}
+              onChange={e => setEditing(v => ({ ...(v ?? { country_code: '', country_name: '', notes: '', allies: '', enemies: '', in_nato: false, in_un: false }), score: Number(e.target.value) }))}
+              style={{ flex: 1 }}
+            />
+            <span style={{ fontSize: 11, fontWeight: 700, color: standingColor(editing?.score ?? 50), ...bodyFont, minWidth: 60 }}>
+              {standingLabel(editing?.score ?? 50)}
+            </span>
+          </div>
+          <input
+            placeholder="Allies (comma-separated, e.g. France, Germany)"
+            value={editing?.allies ?? ''}
+            onChange={e => setEditing(v => ({ ...(v ?? { country_code: '', country_name: '', score: 50, notes: '', enemies: '', in_nato: false, in_un: false }), allies: e.target.value }))}
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', padding: '7px 10px', fontSize: 12, outline: 'none', ...bodyFont }}
+          />
+          <input
+            placeholder="Enemies (comma-separated)"
+            value={editing?.enemies ?? ''}
+            onChange={e => setEditing(v => ({ ...(v ?? { country_code: '', country_name: '', score: 50, notes: '', allies: '', in_nato: false, in_un: false }), enemies: e.target.value }))}
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(196,18,48,0.2)', color: '#f0f4ff', padding: '7px 10px', fontSize: 12, outline: 'none', ...bodyFont }}
+          />
+          <div style={{ display: 'flex', gap: 16 }}>
+            {([['in_nato', 'NATO Member'] as const, ['in_un', 'UN Member'] as const]).map(([field, label]) => (
+              <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={editing?.[field] ?? false}
+                  onChange={e => setEditing(v => ({ ...(v ?? { country_code: '', country_name: '', score: 50, notes: '', allies: '', enemies: '', in_nato: false, in_un: false }), [field]: e.target.checked }))}
+                />
+                <span style={{ fontSize: 12, color: '#b8c4e8', ...bodyFont }}>{label}</span>
+              </label>
+            ))}
+          </div>
+          <textarea
+            placeholder="Notes (optional)"
+            value={editing?.notes ?? ''}
+            onChange={e => setEditing(v => ({ ...(v ?? { country_code: '', country_name: '', score: 50, allies: '', enemies: '', in_nato: false, in_un: false }), notes: e.target.value }))}
+            rows={2}
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', padding: '7px 10px', fontSize: 12, outline: 'none', resize: 'vertical', ...bodyFont }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleSave}
+              disabled={saving || !editing?.country_code || !editing?.country_name}
+              style={{ flex: 1, background: '#c9a227', color: '#0a1a50', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '8px', border: 'none', cursor: 'pointer', opacity: saving || !editing?.country_code || !editing?.country_name ? 0.4 : 1, ...bodyFont }}
+            >
+              {saving ? '…' : 'Save'}
+            </button>
+            {editing && (
+              <button onClick={() => setEditing(null)}
+                style={{ padding: '8px 14px', background: 'transparent', border: '1px solid rgba(106,128,176,0.3)', color: '#6a80b0', cursor: 'pointer', fontSize: 12, ...bodyFont }}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* List */}
+      <div>
+        <input
+          placeholder="Search countries…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.15)', color: '#f0f4ff', padding: '7px 10px', fontSize: 12, outline: 'none', marginBottom: 10, boxSizing: 'border-box', ...bodyFont }}
+        />
+        {filtered.length === 0 ? (
+          <p style={{ fontSize: 12, color: '#3d4f70', ...bodyFont }}>No standings recorded yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+            {filtered.map(s => (
+              <div key={s.country_code} style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#f0f4ff', ...bodyFont }}>{s.country_name} <span style={{ color: '#3d4f70' }}>({s.country_code})</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                    <div style={{ height: 3, width: 60, background: 'rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${s.score}%`, background: standingColor(s.score) }} />
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: standingColor(s.score), ...bodyFont }}>{standingLabel(s.score)} · {s.score}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                  <button onClick={() => setEditing(s)}
+                    style={{ fontSize: 10, padding: '4px 8px', background: 'transparent', border: '1px solid rgba(201,162,39,0.3)', color: '#c9a227', cursor: 'pointer', ...bodyFont }}>
+                    Edit
+                  </button>
+                  <button onClick={() => handleDelete(s.country_code)}
+                    style={{ fontSize: 10, padding: '4px 8px', background: 'transparent', border: '1px solid rgba(196,18,48,0.3)', color: '#c41230', cursor: 'pointer', ...bodyFont }}>
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissElection }: { onClose: () => void; onPartiesChanged: () => void; onElectionChanged: () => void; onDismissElection: (id: string) => void }) {
-  const [tab, setTab] = useState<'admins' | 'parties' | 'elections' | 'constitution'>('admins')
+  const [tab, setTab] = useState<'admins' | 'parties' | 'elections' | 'constitution' | 'standings'>('admins')
 
   useEffect(() => {
     const scrollY = window.scrollY
@@ -653,8 +853,8 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissEle
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{
-        width: '100%', maxWidth: 520,
-        maxHeight: '85vh',
+        width: '100%', maxWidth: 820,
+        maxHeight: '90vh',
         display: 'flex', flexDirection: 'column',
         background: '#0a1a50',
         border: '1.5px solid rgba(201,162,39,0.35)',
@@ -684,7 +884,7 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissEle
 
         {/* Tabs */}
         <div style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid rgba(201,162,39,0.15)', overflowX: 'auto' }}>
-          {(['admins', 'parties', 'elections', 'constitution'] as const).map((t) => (
+          {(['admins', 'parties', 'elections', 'constitution', 'standings'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className="px-5 py-3 text-xs font-bold uppercase tracking-widest transition-all duration-200 whitespace-nowrap"
               style={{
@@ -695,7 +895,7 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissEle
                 marginBottom: -1,
               }}
             >
-              {t === 'admins' ? '★ Admins' : t === 'parties' ? '🏛 Parties' : t === 'elections' ? '🗳 Elections' : '📜 Constitution'}
+              {t === 'admins' ? '★ Admins' : t === 'parties' ? '🏛 Parties' : t === 'elections' ? '🗳 Elections' : t === 'constitution' ? '📜 Constitution' : '🌍 Standing'}
             </button>
           ))}
         </div>
@@ -705,7 +905,8 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissEle
           {tab === 'admins' ? <AdminPanelAdmins />
             : tab === 'parties' ? <AdminPanelParties onPartiesChanged={onPartiesChanged} />
             : tab === 'elections' ? <AdminPanelElections onElectionChanged={onElectionChanged} onDismissElection={onDismissElection} />
-            : <AdminPanelConstitution />}
+            : tab === 'constitution' ? <AdminPanelConstitution />
+            : <AdminPanelStandings />}
         </div>
       </div>
     </div>
@@ -844,12 +1045,13 @@ function NavBar({
           </div>
         </a>
 
-        <ul className="hidden md:flex items-center gap-8">
+        <ul className="hidden md:flex items-center gap-5">
           {[
             { label: 'Parliament', href: '#parliament', id: 'parliament' },
-            { label: 'High Court', href: '#court', id: 'court' },
+            { label: 'Court', href: '#court', id: 'court' },
             { label: 'Parties', href: '#parties', id: 'parties' },
             { label: 'Approval', href: '#approval', id: 'approval' },
+            { label: 'Standing', href: '#standing', id: 'standing' },
             { label: 'Constitution', href: '#constitution', id: 'constitution' },
             { label: 'Politicians', href: '#politicians', id: 'politicians' },
             { label: 'About', href: '#about', id: 'about' },
@@ -937,6 +1139,7 @@ function NavBar({
             { label: 'High Court', href: '#court', id: 'court' },
             { label: 'Parties', href: '#parties', id: 'parties' },
             { label: 'Approval', href: '#approval', id: 'approval' },
+            { label: 'Standing', href: '#standing', id: 'standing' },
             { label: 'Constitution', href: '#constitution', id: 'constitution' },
             { label: 'Politicians', href: '#politicians', id: 'politicians' },
             { label: 'About', href: '#about', id: 'about' },
@@ -2455,6 +2658,515 @@ function ElectionPage({ election, session, parties }: { election: Election; sess
   )
 }
 
+const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
+
+// Static world organisation data keyed by ISO 3166-1 numeric code (geo.id from world-atlas)
+const NATO  = new Set([8,56,100,124,191,203,208,233,246,250,276,300,348,352,380,428,440,442,499,807,528,578,616,620,642,703,705,724,752,792,826,840])
+const EU    = new Set([40,56,100,191,196,203,208,233,246,250,276,300,348,372,380,428,440,442,470,528,616,620,642,703,705,724,752])
+const G7    = new Set([124,250,276,380,392,826,840])
+const G20   = new Set([36,76,124,156,250,276,356,360,380,392,410,484,643,682,710,792,826,840])
+const FIVE_EYES = new Set([36,124,554,826,840])
+const BRICS = new Set([76,156,231,356,364,643,710,784,818])
+const ASEAN = new Set([96,116,360,418,458,104,608,702,764,704])
+const SCO   = new Set([156,356,364,398,417,586,643,762,860])
+const AUKUS = new Set([36,826,840])
+const ARAB_LEAGUE = new Set([12,48,262,818,368,400,414,422,434,478,504,512,634,682,706,729,760,788,784,887])
+const COMMONWEALTH = new Set([36,50,52,64,72,84,124,174,266,270,288,328,356,404,426,454,458,462,516,554,566,586,598,690,694,702,710,748,800,826,834,894,716])
+const UN_NON_MEMBERS = new Set([336,158]) // Vatican, Taiwan
+
+type WorldMeta = { blocs: string[]; un: boolean }
+function getWorldMeta(geoId: string | number): WorldMeta {
+  const id = Number(geoId)
+  const blocs: string[] = []
+  if (NATO.has(id))         blocs.push('NATO')
+  if (EU.has(id))           blocs.push('EU')
+  if (FIVE_EYES.has(id))    blocs.push('Five Eyes')
+  if (AUKUS.has(id))        blocs.push('AUKUS')
+  if (G7.has(id))           blocs.push('G7')
+  else if (G20.has(id))     blocs.push('G20')
+  if (BRICS.has(id))        blocs.push('BRICS')
+  if (SCO.has(id))          blocs.push('SCO')
+  if (ASEAN.has(id))        blocs.push('ASEAN')
+  if (COMMONWEALTH.has(id)) blocs.push('Commonwealth')
+  if (ARAB_LEAGUE.has(id))  blocs.push('Arab League')
+  return { blocs, un: !UN_NON_MEMBERS.has(id) }
+}
+
+const BLOC_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  'NATO':         { bg: 'rgba(26,106,173,0.2)',  border: 'rgba(26,106,173,0.5)',  text: '#5a9fd8' },
+  'EU':           { bg: 'rgba(0,51,153,0.2)',    border: 'rgba(80,120,220,0.5)',  text: '#7090e0' },
+  'Five Eyes':    { bg: 'rgba(42,157,143,0.2)',  border: 'rgba(42,157,143,0.5)',  text: '#2a9d8f' },
+  'AUKUS':        { bg: 'rgba(60,80,160,0.2)',   border: 'rgba(100,130,200,0.4)', text: '#8aabdf' },
+  'G7':           { bg: 'rgba(123,94,167,0.2)',  border: 'rgba(123,94,167,0.5)',  text: '#9b7ec8' },
+  'G20':          { bg: 'rgba(100,80,140,0.15)', border: 'rgba(100,80,140,0.4)', text: '#8878b0' },
+  'BRICS':        { bg: 'rgba(224,112,32,0.2)',  border: 'rgba(224,112,32,0.5)',  text: '#e07020' },
+  'SCO':          { bg: 'rgba(180,40,40,0.15)',  border: 'rgba(180,40,40,0.4)',   text: '#c06060' },
+  'ASEAN':        { bg: 'rgba(46,122,181,0.2)',  border: 'rgba(46,122,181,0.5)',  text: '#4a9fd0' },
+  'Commonwealth': { bg: 'rgba(180,140,0,0.15)',  border: 'rgba(201,162,39,0.4)',  text: '#c9a227' },
+  'Arab League':  { bg: 'rgba(45,106,79,0.2)',   border: 'rgba(45,106,79,0.5)',   text: '#4a9f6f' },
+  'UN':           { bg: 'rgba(74,120,200,0.15)', border: 'rgba(74,120,200,0.4)', text: '#6a9fd8' },
+}
+
+const NEUTRAL_STANDING: Omit<CountryStanding, 'country_code' | 'country_name'> = { score: 50, notes: '', allies: '', enemies: '', in_nato: false, in_un: false }
+const NEUTRAL_COLOR = '#6a80b0'
+
+// ISO numeric → [ISO-A2, display name]
+const ISO_INFO: Record<number, [string, string]> = {
+  4:['AF','Afghanistan'],8:['AL','Albania'],12:['DZ','Algeria'],20:['AD','Andorra'],24:['AO','Angola'],
+  31:['AZ','Azerbaijan'],32:['AR','Argentina'],36:['AU','Australia'],40:['AT','Austria'],50:['BD','Bangladesh'],
+  51:['AM','Armenia'],56:['BE','Belgium'],64:['BT','Bhutan'],68:['BO','Bolivia'],76:['BR','Brazil'],
+  96:['BN','Brunei'],100:['BG','Bulgaria'],104:['MM','Myanmar'],108:['BI','Burundi'],112:['BY','Belarus'],
+  116:['KH','Cambodia'],120:['CM','Cameroon'],124:['CA','Canada'],140:['CF','Central African Rep.'],
+  144:['LK','Sri Lanka'],152:['CL','Chile'],156:['CN','China'],158:['TW','Taiwan'],170:['CO','Colombia'],
+  175:['YT','Mayotte'],178:['CG','Congo'],180:['CD','DR Congo'],188:['CR','Costa Rica'],191:['HR','Croatia'],
+  192:['CU','Cuba'],196:['CY','Cyprus'],203:['CZ','Czechia'],208:['DK','Denmark'],218:['EC','Ecuador'],
+  231:['ET','Ethiopia'],232:['ER','Eritrea'],233:['EE','Estonia'],246:['FI','Finland'],250:['FR','France'],
+  266:['GA','Gabon'],268:['GE','Georgia'],276:['DE','Germany'],288:['GH','Ghana'],300:['GR','Greece'],
+  320:['GT','Guatemala'],324:['GN','Guinea'],332:['HT','Haiti'],340:['HN','Honduras'],344:['HK','Hong Kong'],
+  348:['HU','Hungary'],356:['IN','India'],360:['ID','Indonesia'],364:['IR','Iran'],368:['IQ','Iraq'],
+  372:['IE','Ireland'],376:['IL','Israel'],380:['IT','Italy'],384:['CI','Côte d\'Ivoire'],392:['JP','Japan'],
+  398:['KZ','Kazakhstan'],400:['JO','Jordan'],404:['KE','Kenya'],408:['KP','North Korea'],410:['KR','South Korea'],
+  414:['KW','Kuwait'],417:['KG','Kyrgyzstan'],418:['LA','Laos'],422:['LB','Lebanon'],428:['LV','Latvia'],
+  430:['LR','Liberia'],434:['LY','Libya'],440:['LT','Lithuania'],442:['LU','Luxembourg'],
+  458:['MY','Malaysia'],466:['ML','Mali'],470:['MT','Malta'],484:['MX','Mexico'],496:['MN','Mongolia'],
+  499:['ME','Montenegro'],504:['MA','Morocco'],508:['MZ','Mozambique'],512:['OM','Oman'],516:['NA','Namibia'],
+  524:['NP','Nepal'],528:['NL','Netherlands'],548:['VU','Vanuatu'],554:['NZ','New Zealand'],
+  566:['NG','Nigeria'],578:['NO','Norway'],585:['PW','Palau'],586:['PK','Pakistan'],
+  591:['PA','Panama'],598:['PG','Papua New Guinea'],600:['PY','Paraguay'],604:['PE','Peru'],
+  608:['PH','Philippines'],616:['PL','Poland'],620:['PT','Portugal'],626:['TL','Timor-Leste'],
+  634:['QA','Qatar'],642:['RO','Romania'],643:['RU','Russia'],682:['SA','Saudi Arabia'],
+  694:['SL','Sierra Leone'],702:['SG','Singapore'],703:['SK','Slovakia'],705:['SI','Slovenia'],
+  706:['SO','Somalia'],710:['ZA','South Africa'],724:['ES','Spain'],729:['SD','Sudan'],
+  736:['SD','Sudan'],748:['SZ','Eswatini'],752:['SE','Sweden'],760:['SY','Syria'],762:['TJ','Tajikistan'],
+  764:['TH','Thailand'],768:['TG','Togo'],784:['AE','UAE'],788:['TN','Tunisia'],792:['TR','Turkey'],
+  800:['UG','Uganda'],804:['UA','Ukraine'],807:['MK','North Macedonia'],818:['EG','Egypt'],
+  826:['GB','United Kingdom'],834:['TZ','Tanzania'],840:['US','United States'],
+  860:['UZ','Uzbekistan'],862:['VE','Venezuela'],887:['YE','Yemen'],894:['ZM','Zambia'],
+  275:['PS','Palestine'],716:['ZW','Zimbabwe'],504:['MA','Morocco'],288:['GH','Ghana'],
+  434:['LY','Libya'],706:['SO','Somalia'],231:['ET','Ethiopia'],
+}
+
+// Bilateral allies (public knowledge — formal treaties & alliances)
+const ALLIES_MAP: Record<number, number[]> = {
+  // Western / NATO core
+  840:[826,124,36,554,250,276,380,392,410,724,578,616,528,376,784,682,400,818], // US
+  826:[840,124,36,554,250,276,380,724,578,616,528,804,376],                     // UK
+  250:[840,826,276,380,724,578,616,36,392,528],                                 // France
+  276:[840,826,250,380,724,578,616,36,528,376,804],                             // Germany
+  392:[840,826,410,36,250,276,528],                                             // Japan
+  410:[840,826,392,36,250,276],                                                 // South Korea
+  36: [840,826,124,554,392,410,250,276,528],                                   // Australia
+  124:[840,826,36,554,250,276,578,616],                                        // Canada
+  554:[840,826,36,124,608],                                                    // New Zealand
+  528:[840,826,250,276,380,578,616,804],                                       // Netherlands
+  724:[840,826,250,276,380,578,616,528],                                       // Spain
+  578:[840,826,250,276,380,616,528,804],                                       // Norway
+  616:[840,826,250,276,380,578,528,804],                                       // Poland
+  380:[840,826,250,276,724,578,528],                                           // Italy
+  300:[840,826,250,276,380,724,578],                                           // Greece (NATO, vs Turkey complex)
+  233:[840,826,250,276,616,804,528],                                           // Estonia (NATO, anti-Russia)
+  428:[840,826,250,276,616,804,528],                                           // Latvia
+  440:[840,826,250,276,616,804,528],                                           // Lithuania
+  348:[840,826,250,276,616,578,804],                                           // Hungary (NATO but complex)
+  642:[840,826,250,276,616,578,804],                                           // Romania
+  // Russia/SCO bloc
+  643:[156,112,364,762,860,398,408,760],                                       // Russia
+  156:[643,364,398,762,860,586,408,76,710,356],                                // China
+  112:[643,760],                                                               // Belarus
+  364:[643,156,760,422,275,408,887],                                           // Iran
+  408:[643,156,760],                                                           // North Korea
+  760:[643,364,112,422,275],                                                   // Syria
+  422:[364,275,760,643],                                                       // Lebanon
+  // BRICS / emerging
+  356:[643,156,76,710,724,840,376,682],                                        // India
+  76: [156,643,356,710,818,250,840],                                           // Brazil
+  710:[156,643,356,76,818,234],                                                // South Africa
+  // Middle East
+  682:[840,826,784,400,818,250,276,356],                                       // Saudi Arabia
+  784:[840,826,682,400,818,376],                                               // UAE
+  400:[840,826,682,784,818,376],                                               // Jordan
+  818:[682,784,826,840,400,376],                                               // Egypt
+  376:[840,826,276,356,400,784,818],                                           // Israel
+  // Palestine / resistance axis
+  275:[364,422,760,643,792,12,818,400,682],                                   // Palestine (Arab League + Iran)
+  887:[364,643,422,275],                                                       // Yemen (Houthi-aligned)
+  // Turkey
+  792:[840,826,250,276,380,618,400,782,682],                                   // Turkey (NATO member, complex)
+  // Pakistan / Afghanistan
+  586:[156,840,682,792,364],                                                   // Pakistan
+  4:  [586,792,364],                                                           // Afghanistan (Taliban-era ties)
+  // Central Asia
+  398:[643,156,762,860,417],                                                   // Kazakhstan
+  762:[643,156,398,860,417],                                                   // Tajikistan
+  860:[643,156,398,762,417],                                                   // Uzbekistan
+  417:[643,156,398,762,860],                                                   // Kyrgyzstan
+  // Southeast Asia
+  608:[840,826,36,554,410],                                                    // Philippines
+  702:[840,826,36,276,156],                                                    // Singapore
+  // Africa
+  804:[250,276,826,840,616,578,380,724,528,233,428,440],                       // Ukraine
+}
+
+// Adversaries (publicly documented state-level hostilities)
+const ENEMIES_MAP: Record<number, number[]> = {
+  // Russia bloc vs West
+  643:[840,826,250,276,804,616,578,380,724,528,233,428,440,300,392,410],     // Russia
+  840:[643,408,364,862,192,156],                                              // US
+  826:[643,408,364,760],                                                      // UK
+  250:[643,760],                                                              // France
+  276:[643],                                                                  // Germany
+  616:[643,112],                                                              // Poland
+  233:[643],                                                                  // Estonia
+  428:[643],                                                                  // Latvia
+  440:[643],                                                                  // Lithuania
+  578:[643],                                                                  // Norway
+  804:[643,112],                                                              // Ukraine
+  112:[804,616,840,826,250,276],                                              // Belarus
+  // North Korea axis
+  408:[840,410,392,826,250,276],                                              // North Korea
+  410:[408,643],                                                              // South Korea
+  392:[408,156],                                                              // Japan (N.Korea + China territorial)
+  // Iran / Israel / Middle East
+  364:[376,840,682,826,784,400,792],                                          // Iran
+  376:[364,422,760,275,887,643],                                              // Israel ← added Palestine (275) and Yemen
+  275:[376,840,826],                                                          // Palestine → Israel, US, UK
+  760:[376,840,826,792,233],                                                  // Syria
+  422:[376,682,840,784],                                                      // Lebanon
+  682:[364,887,275,643],                                                      // Saudi Arabia
+  887:[682,840,826,376,784],                                                  // Yemen (Houthis)
+  784:[364,887,275,643],                                                      // UAE
+  // China rivalries
+  156:[158,392,356,840,608,554,36],                                           // China
+  158:[156],                                                                  // Taiwan
+  // India / Pakistan
+  356:[586,156],                                                              // India
+  586:[356,840,826],                                                          // Pakistan
+  // Armenia / Azerbaijan
+  51: [31],                                                                   // Armenia
+  31: [51],                                                                   // Azerbaijan
+  // Cuba / Venezuela
+  192:[840],
+  862:[840],
+  // Libya / Sudan conflicts
+  434:[840,826,250,784],                                                      // Libya
+  729:[231,843],                                                              // Sudan
+  // Ethiopia / Eritrea
+  231:[232],                                                                  // Ethiopia
+  232:[231],                                                                  // Eritrea
+  // Turkey tensions
+  792:[760,364,156,300,51],                                                   // Turkey (Syria, Iran, China, Greece, Armenia)
+  300:[792],                                                                  // Greece ↔ Turkey
+  // Somalia
+  706:[231,840],                                                              // Somalia
+}
+
+function getAutoAllies(id: number): Array<{ id: number; a2: string; name: string }> {
+  return (ALLIES_MAP[id] ?? [])
+    .filter(n => ISO_INFO[n])
+    .map(n => ({ id: n, a2: ISO_INFO[n][0], name: ISO_INFO[n][1] }))
+    .slice(0, 12)
+}
+
+function getAutoEnemies(id: number): Array<{ id: number; a2: string; name: string }> {
+  return (ENEMIES_MAP[id] ?? [])
+    .filter(n => ISO_INFO[n])
+    .map(n => ({ id: n, a2: ISO_INFO[n][0], name: ISO_INFO[n][1] }))
+    .slice(0, 8)
+}
+
+function CountryFlag({ a2, name }: { a2: string; name: string }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <img
+        src={`https://flagcdn.com/w20/${a2.toLowerCase()}.png`}
+        alt={name}
+        style={{ width: 20, height: 14, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)', display: 'block' }}
+      />
+      {hovered && (
+        <div style={{
+          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          background: '#0a1a50', border: '1px solid rgba(201,162,39,0.3)',
+          padding: '2px 6px', fontSize: 9, color: '#f0f4ff', whiteSpace: 'nowrap',
+          fontFamily: 'var(--font-body)', zIndex: 10, marginBottom: 3,
+          pointerEvents: 'none',
+        }}>
+          {name}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StandingsPage() {
+  const [standings, setStandings] = useState<CountryStanding[]>([])
+  const [hoveredCountry, setHoveredCountry] = useState<{ country: CountryStanding | null; name: string; isNeutral: boolean; geoId: string | number } | null>(null)
+  const [zoom, setZoom] = useState(1)
+  const [center, setCenter] = useState<[number, number]>([0, 10])
+  const tooltipRef = useRef<HTMLDivElement>(null)
+  const visibleRef = useRef(false)
+
+  useEffect(() => { loadStandings().then(setStandings) }, [])
+
+  const standingMap = useMemo(() => Object.fromEntries(standings.map(s => [s.country_code, s])), [standings])
+
+  const handleContainerMouseMove = (e: React.MouseEvent) => {
+    if (!tooltipRef.current || !visibleRef.current) return
+    const x = e.clientX + 16
+    const y = e.clientY - 8
+    tooltipRef.current.style.left = `${x}px`
+    tooltipRef.current.style.top = `${y}px`
+  }
+
+  const handleContainerMouseLeave = () => {
+    visibleRef.current = false
+    if (tooltipRef.current) tooltipRef.current.style.display = 'none'
+    setHoveredCountry(null)
+  }
+
+  const MIN_ZOOM = 1
+  const MAX_ZOOM = 8
+  const zoomIn  = () => setZoom(z => Math.min(z * 1.5, MAX_ZOOM))
+  const zoomOut = () => setZoom(z => Math.max(z / 1.5, MIN_ZOOM))
+  const zoomReset = () => { setZoom(1); setCenter([0, 10]) }
+
+  return (
+    <section id="standing" style={{ background: 'linear-gradient(180deg, #050d28 0%, #060f30 100%)', paddingTop: 80, paddingBottom: 80 }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.4em', color: '#c9a227', fontFamily: 'var(--font-body)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 12 }}>
+            Foreign Relations
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 42, fontWeight: 900, color: '#f0f4ff', lineHeight: 1, marginBottom: 16 }}>
+            World Standing
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', marginBottom: 20 }}>
+            <div style={{ height: 1, width: 60, background: 'rgba(201,162,39,0.3)' }} />
+            <div style={{ width: 6, height: 6, background: '#c9a227', transform: 'rotate(45deg)' }} />
+            <div style={{ height: 1, width: 60, background: 'rgba(201,162,39,0.3)' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {([['Very Bad', '#c41230'], ['Bad', '#e07020'], ['Neutral', '#6a80b0'], ['Good', '#4a9f6f'], ['Very Good', '#c9a227']] as const).map(([label, color]) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 10, height: 10, background: color, borderRadius: 2 }} />
+                <span style={{ fontSize: 11, color: '#b8c4e8', fontFamily: 'var(--font-body)' }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Map + zoom controls */}
+        <div style={{ position: 'relative' }}>
+          <div
+            style={{ position: 'relative', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}
+            onMouseMove={handleContainerMouseMove}
+            onMouseLeave={handleContainerMouseLeave}
+          >
+            <ComposableMap projectionConfig={{ scale: 147 }} style={{ width: '100%', height: 'auto' }}>
+              <ZoomableGroup
+                zoom={zoom}
+                center={center}
+                onMoveEnd={({ zoom: z, coordinates }) => { setZoom(z); setCenter(coordinates as [number, number]) }}
+                minZoom={MIN_ZOOM}
+                maxZoom={MAX_ZOOM}
+              >
+                <Geographies geography={GEO_URL}>
+                  {({ geographies }) =>
+                    geographies.map((geo) => {
+                      const code = geo.properties.ISO_A2 ?? geo.id
+                      const standing = standingMap[code]
+                      const fill = standing ? standingColor(standing.score) : NEUTRAL_COLOR
+                      return (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill={fill}
+                          stroke="#050d28"
+                          strokeWidth={0.5}
+                          style={{
+                            default: { fill, outline: 'none' },
+                            hover: { fill: standing ? standingColor(standing.score) : '#8aa0c8', outline: 'none', cursor: zoom > 1 ? 'grab' : 'pointer', filter: 'brightness(1.25)' },
+                            pressed: { outline: 'none', cursor: 'grabbing' },
+                          }}
+                          onMouseEnter={() => {
+                            const name = geo.properties.NAME ?? geo.properties.name ?? code
+                            visibleRef.current = true
+                            if (tooltipRef.current) tooltipRef.current.style.display = 'block'
+                            setHoveredCountry({ country: standing ?? null, name, isNeutral: !standing, geoId: geo.id })
+                          }}
+                        />
+                      )
+                    })
+                  }
+                </Geographies>
+              </ZoomableGroup>
+            </ComposableMap>
+          </div>
+
+          {/* Zoom controls */}
+          <div style={{
+            position: 'absolute', right: 10, top: 10,
+            display: 'flex', flexDirection: 'column', gap: 4,
+            zIndex: 10,
+          }}>
+            {[
+              { label: '+', action: zoomIn,   title: 'Zoom in'  },
+              { label: '−', action: zoomOut,  title: 'Zoom out' },
+              { label: '⌂', action: zoomReset, title: 'Reset'   },
+            ].map(({ label, action, title }) => (
+              <button key={label} onClick={action} title={title}
+                style={{
+                  width: 32, height: 32, background: 'rgba(10,26,80,0.9)',
+                  border: '1px solid rgba(201,162,39,0.35)', color: '#c9a227',
+                  fontSize: label === '⌂' ? 14 : 18, fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'var(--font-body)',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,162,39,0.15)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(10,26,80,0.9)')}
+              >
+                {label}
+              </button>
+            ))}
+            {/* Zoom level indicator */}
+            <div style={{
+              width: 32, fontSize: 9, color: '#6a80b0', textAlign: 'center',
+              fontFamily: 'var(--font-body)', fontWeight: 700,
+              background: 'rgba(10,26,80,0.7)', border: '1px solid rgba(255,255,255,0.06)',
+              padding: '2px 0',
+            }}>
+              {Math.round(zoom * 100)}%
+            </div>
+          </div>
+
+          {/* Tooltip */}
+          <div ref={tooltipRef} style={{
+            display: 'none', position: 'fixed',
+            background: '#0a1a50', border: '1px solid rgba(201,162,39,0.35)',
+            padding: '12px 14px', zIndex: 1000, width: 250,
+            pointerEvents: 'none', boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+          }}>
+            {hoveredCountry && (() => {
+              const c = hoveredCountry.country
+              const score = c?.score ?? 50
+              const label = standingLabel(score)
+              const color = standingColor(score)
+              const geoNum = Number(hoveredCountry.geoId)
+              const worldMeta = getWorldMeta(geoNum)
+              const allBlocs = worldMeta.un ? ['UN', ...worldMeta.blocs] : worldMeta.blocs
+              const autoAllies  = getAutoAllies(geoNum)
+              const autoEnemies = getAutoEnemies(geoNum)
+              const customAllies  = c?.allies?.split(',').map(s => s.trim()).filter(Boolean) ?? []
+              const customEnemies = c?.enemies?.split(',').map(s => s.trim()).filter(Boolean) ?? []
+              const bf = { fontFamily: 'var(--font-body)' } as const
+              return (
+                <>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', fontFamily: 'var(--font-display)', marginBottom: 8, borderBottom: '1px solid rgba(201,162,39,0.2)', paddingBottom: 7 }}>
+                    {hoveredCountry.name}
+                  </div>
+
+                  {/* Org badges */}
+                  {allBlocs.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
+                      {allBlocs.map(bloc => {
+                        const s = BLOC_COLORS[bloc] ?? BLOC_COLORS['UN']
+                        return <span key={bloc} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', padding: '2px 5px', background: s.bg, border: `1px solid ${s.border}`, color: s.text, ...bf }}>{bloc}</span>
+                      })}
+                    </div>
+                  )}
+
+                  {/* Anderside standing */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <span style={{ fontSize: 10, color: '#6a80b0', textTransform: 'uppercase', letterSpacing: '0.08em', ...bf }}>Anderside Standing</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color, ...bf }}>{label}</span>
+                  </div>
+                  <div style={{ height: 3, background: 'rgba(255,255,255,0.07)', borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
+                    <div style={{ height: '100%', width: `${score}%`, background: color }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <span style={{ fontSize: 9, color: '#6a80b0', ...bf }}>Score</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color, ...bf }}>{hoveredCountry.isNeutral ? '50 (default)' : `${score}/100`}</span>
+                  </div>
+
+                  {/* Real-world allies */}
+                  {autoAllies.length > 0 && (
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, marginBottom: 8 }}>
+                      <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#4a9f6f', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, ...bf }}>Allies</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {autoAllies.map(a => <CountryFlag key={a.id} a2={a.a2} name={a.name} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Real-world enemies */}
+                  {autoEnemies.length > 0 && (
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, marginBottom: customAllies.length || customEnemies.length || c?.notes ? 8 : 0 }}>
+                      <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#c41230', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6, ...bf }}>Adversaries</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {autoEnemies.map(e => <CountryFlag key={e.id} a2={e.a2} name={e.name} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Admin-set custom Anderside allies */}
+                  {customAllies.length > 0 && (
+                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, marginBottom: customEnemies.length ? 6 : 0 }}>
+                      <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#4a9f6f', fontWeight: 700, textTransform: 'uppercase', marginBottom: 5, ...bf }}>Allied w/ Anderside</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {customAllies.map(a => <span key={a} style={{ fontSize: 10, color: '#b8c4e8', background: 'rgba(74,159,111,0.1)', border: '1px solid rgba(74,159,111,0.25)', padding: '1px 5px', ...bf }}>{a}</span>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Admin-set custom Anderside enemies */}
+                  {customEnemies.length > 0 && (
+                    <div style={{ borderTop: customAllies.length ? 'none' : '1px solid rgba(255,255,255,0.06)', paddingTop: customAllies.length ? 0 : 8 }}>
+                      <div style={{ fontSize: 9, letterSpacing: '0.12em', color: '#c41230', fontWeight: 700, textTransform: 'uppercase', marginBottom: 5, ...bf }}>Opposed to Anderside</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {customEnemies.map(e => <span key={e} style={{ fontSize: 10, color: '#b8c4e8', background: 'rgba(196,18,48,0.1)', border: '1px solid rgba(196,18,48,0.25)', padding: '1px 5px', ...bf }}>{e}</span>)}
+                      </div>
+                    </div>
+                  )}
+
+                  {c?.notes && (
+                    <div style={{ marginTop: 6, fontSize: 10, color: '#8a9dc0', ...bf, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 7 }}>
+                      {c.notes}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
+        </div>
+
+        {/* Countries with standings list */}
+        {standings.length > 0 && (
+          <div style={{ marginTop: 32 }}>
+            <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, fontFamily: 'var(--font-body)', marginBottom: 16 }}>Recorded Relations</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+              {standings.sort((a, b) => b.score - a.score).map(s => (
+                <div key={s.country_code} style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#c8d4f0', fontFamily: 'var(--font-body)' }}>{s.country_name}</div>
+                    <div style={{ fontSize: 10, color: standingColor(s.score), fontFamily: 'var(--font-body)', fontWeight: 700, marginTop: 2 }}>{standingLabel(s.score)}</div>
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: standingColor(s.score), fontFamily: 'var(--font-display)' }}>{s.score}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+
 function ConstitutionPage() {
   const [sections, setSections] = useState<ConstitutionSection[]>([])
   const [loading, setLoading] = useState(true)
@@ -2893,7 +3605,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const ids = ['parliament', 'court', 'parties', 'approval', 'constitution', 'politicians', 'about', 'join']
+    const ids = ['parliament', 'court', 'parties', 'approval', 'standing', 'constitution', 'politicians', 'about', 'join']
     const onScroll = () => {
       const mid = window.innerHeight * 0.4
       let current = ''
@@ -2919,6 +3631,7 @@ export default function App() {
       <Parties parties={parties} loading={partiesLoading} />
       {activeElection && <ElectionPage election={activeElection} session={session} parties={parties} />}
       <ApprovalPage parties={parties} isAdmin={isAdmin} />
+      <StandingsPage />
       <ConstitutionPage />
       <PoliticiansSection />
       <About />
