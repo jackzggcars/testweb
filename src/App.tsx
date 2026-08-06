@@ -670,6 +670,27 @@ function AdminPanelStandings() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<CountryStanding | null>(null)
   const [saving, setSaving] = useState(false)
+  const [countryQuery, setCountryQuery] = useState('')
+  const [showCountryDrop, setShowCountryDrop] = useState(false)
+
+  const countryOptions = Object.entries(ISO_INFO)
+    .map(([num, [a2, name]]) => ({ num: Number(num), a2, name }))
+    .filter(({ name, a2 }) =>
+      countryQuery.length > 0 &&
+      (name.toLowerCase().includes(countryQuery.toLowerCase()) ||
+       a2.toLowerCase().includes(countryQuery.toLowerCase()))
+    )
+    .slice(0, 10)
+
+  const selectCountry = (a2: string, name: string) => {
+    setEditing(v => ({
+      ...(v ?? { score: 50, notes: '', allies: '', enemies: '', in_nato: false, in_un: false }),
+      country_code: a2,
+      country_name: name,
+    }))
+    setCountryQuery(name)
+    setShowCountryDrop(false)
+  }
 
   useEffect(() => { loadStandings().then(setStandings) }, [])
 
@@ -682,13 +703,14 @@ function AdminPanelStandings() {
       await saveStanding(editing)
       await refresh()
       setEditing(null)
+      setCountryQuery('')
     } finally { setSaving(false) }
   }
 
   const handleDelete = async (code: string) => {
     await deleteStanding(code)
     await refresh()
-    if (editing?.country_code === code) setEditing(null)
+    if (editing?.country_code === code) { setEditing(null); setCountryQuery('') }
   }
 
   const filtered = standings.filter(s =>
@@ -706,19 +728,36 @@ function AdminPanelStandings() {
           {editing?.id ? 'Edit Standing' : 'Add Standing'}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div style={{ position: 'relative' }}>
             <input
-              placeholder="Country code (e.g. GB)"
-              value={editing?.country_code ?? ''}
-              onChange={e => setEditing(v => ({ ...(v ?? { country_name: '', score: 50, notes: '', allies: '', enemies: '', in_nato: false, in_un: false }), country_code: e.target.value.toUpperCase() }))}
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', padding: '7px 10px', fontSize: 12, outline: 'none', ...bodyFont }}
+              placeholder="Search country by name or code…"
+              value={countryQuery}
+              onChange={e => { setCountryQuery(e.target.value); setShowCountryDrop(true) }}
+              onFocus={() => setShowCountryDrop(true)}
+              onBlur={() => setTimeout(() => setShowCountryDrop(false), 150)}
+              style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.06)', border: '1.5px solid rgba(201,162,39,0.35)', color: '#f0f4ff', padding: '8px 10px', fontSize: 13, outline: 'none', ...bodyFont }}
             />
-            <input
-              placeholder="Country name"
-              value={editing?.country_name ?? ''}
-              onChange={e => setEditing(v => ({ ...(v ?? { country_code: '', score: 50, notes: '', allies: '', enemies: '', in_nato: false, in_un: false }), country_name: e.target.value }))}
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', padding: '7px 10px', fontSize: 12, outline: 'none', ...bodyFont }}
-            />
+            {editing?.country_code && (
+              <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: '#6a80b0', pointerEvents: 'none', ...bodyFont }}>
+                {editing.country_code}
+              </span>
+            )}
+            {showCountryDrop && countryOptions.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#0d1e5a', border: '1.5px solid rgba(201,162,39,0.3)', zIndex: 100, maxHeight: 200, overflowY: 'auto' }}>
+                {countryOptions.map(({ a2, name }) => (
+                  <div key={a2}
+                    onMouseDown={() => selectCountry(a2, name)}
+                    style={{ padding: '7px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#f0f4ff', borderBottom: '1px solid rgba(255,255,255,0.04)', ...bodyFont }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(201,162,39,0.12)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <img src={`https://flagcdn.com/w20/${a2.toLowerCase()}.png`} alt="" style={{ width: 18, height: 13, objectFit: 'cover' }} />
+                    <span>{name}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, color: '#6a80b0' }}>{a2}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <label style={{ fontSize: 11, color: '#6a80b0', ...bodyFont, whiteSpace: 'nowrap' }}>Score: {editing?.score ?? 50}</label>
@@ -772,7 +811,7 @@ function AdminPanelStandings() {
               {saving ? '…' : 'Save'}
             </button>
             {editing && (
-              <button onClick={() => setEditing(null)}
+              <button onClick={() => { setEditing(null); setCountryQuery('') }}
                 style={{ padding: '8px 14px', background: 'transparent', border: '1px solid rgba(106,128,176,0.3)', color: '#6a80b0', cursor: 'pointer', fontSize: 12, ...bodyFont }}>
                 Cancel
               </button>
@@ -805,7 +844,7 @@ function AdminPanelStandings() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                  <button onClick={() => setEditing(s)}
+                  <button onClick={() => { setEditing(s); setCountryQuery(s.country_name); setShowCountryDrop(false) }}
                     style={{ fontSize: 10, padding: '4px 8px', background: 'transparent', border: '1px solid rgba(201,162,39,0.3)', color: '#c9a227', cursor: 'pointer', ...bodyFont }}>
                     Edit
                   </button>
