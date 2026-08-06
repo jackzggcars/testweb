@@ -3197,23 +3197,6 @@ function StandingsPage() {
           </div>
         </div>
 
-        {/* Countries with standings list */}
-        {standings.length > 0 && (
-          <div style={{ marginTop: 32 }}>
-            <div style={{ fontSize: 9, letterSpacing: '0.3em', color: '#6a80b0', textTransform: 'uppercase', fontWeight: 700, fontFamily: 'var(--font-body)', marginBottom: 16 }}>Recorded Relations</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
-              {standings.sort((a, b) => b.score - a.score).map(s => (
-                <div key={s.country_code} style={{ padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#c8d4f0', fontFamily: 'var(--font-body)' }}>{s.country_name}</div>
-                    <div style={{ fontSize: 10, color: standingColor(s.score), fontFamily: 'var(--font-body)', fontWeight: 700, marginTop: 2 }}>{standingLabel(s.score)}</div>
-                  </div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: standingColor(s.score), fontFamily: 'var(--font-display)' }}>{s.score}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </section>
   )
