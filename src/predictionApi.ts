@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient'
 
-const UB_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBfaWQiOiIxNTM1OTU0ODU3NjA3OTU0NzA4IiwiaWF0IjoxNzg2MjcwNTc0fQ.tZ0WkdJqQWstAWJ54PKfqVZYQOUHjqqy1C06dXBbSYs'
+const UB_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBfaWQiOiIxNTM1OTU0ODU3NjA3OTU0NzA4IiwiaWF0IjoxNzg2MjcwNzAyfQ.faaJbeUHgHzz5IwdMlBHiH4j5RdQx25S-WSTcP-ygSo'
 const GUILD_ID = '1525592907719905280'
 const UB_BASE = 'https://unbelievaboat.com/api/v1'
 
