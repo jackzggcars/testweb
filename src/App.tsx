@@ -9,7 +9,7 @@ import { supabase } from './supabaseClient'
 import { checkAdmin, getAdmins, addAdmin, removeAdmin, type AdminEntry } from './adminApi'
 import { getParties, createParty, updateParty, deleteParty, type Party } from './partyApi'
 import { getActiveElection, getAllElections, startElection, closeElection, dismissElection, castVote, removeVote, getUserVote, getResults, type Election, type VoteResult } from './electionApi'
-import { getPolls, createPoll, closePoll, resolvePoll, placeBet, getUserBet, getBalance, type PollWithOptions, type Bet } from './predictionApi'
+import { getPolls, createPoll, closePoll, resolvePoll, dismissPoll, placeBet, getUserBet, getBalance, type PollWithOptions, type Bet } from './predictionApi'
 
 // Handles the OAuth redirect callback on page load
 async function handleAuthCallback() {
@@ -897,6 +897,10 @@ function AdminPanelPolls() {
     await resolvePoll(poll.id, optId); await load()
   }
 
+  const handleDismiss = async (id: string) => {
+    await dismissPoll(id); await load()
+  }
+
   const statusColor = (s: string) => s === 'open' ? '#4a9f6f' : s === 'closed' ? '#c9a227' : '#6a80b0'
 
   return (
@@ -973,8 +977,14 @@ function AdminPanelPolls() {
                   </div>
                 )}
                 {p.status === 'resolved' && p.winner_option_id && (
-                  <div style={{ fontSize: 11, color: '#4a9f6f', ...bf }}>
-                    Winner: {p.options.find(o => o.id === p.winner_option_id)?.label ?? '—'} · Paid out
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ fontSize: 11, color: '#4a9f6f', ...bf }}>
+                      Winner: {p.options.find(o => o.id === p.winner_option_id)?.label ?? '—'} · Paid out
+                    </div>
+                    <button onClick={() => handleDismiss(p.id)}
+                      style={{ fontSize: 10, padding: '4px 8px', background: 'transparent', border: '1px solid rgba(196,18,48,0.4)', color: '#c41230', cursor: 'pointer', ...bf }}>
+                      Dismiss
+                    </button>
                   </div>
                 )}
               </div>
