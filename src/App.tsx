@@ -3353,6 +3353,185 @@ class SectionErrorBoundary extends Component<{ children: ReactNode }, { crashed:
   }
 }
 
+const QUICK_AMOUNTS = [10, 50, 100, 500]
+const OPT_COLORS = ['#c9a227', '#4a9fd0', '#9b7ec8', '#4a9f6f', '#e07020', '#c41230']
+
+type BetPanelProps = {
+  poll: PollWithOptions
+  session: Session | null
+  signInWithDiscord: () => void
+  userBet: Bet | null
+  betAmount: string
+  betOption: string
+  betError: string
+  placing: boolean
+  withdrawing: boolean
+  onAmountChange: (v: string) => void
+  onOptionChange: (id: string) => void
+  onBet: () => void
+  onWithdraw: () => void
+}
+
+function BetPanel({ poll, session, signInWithDiscord, userBet, betAmount, betOption, betError, placing, withdrawing, onAmountChange, onOptionChange, onBet, onWithdraw }: BetPanelProps) {
+  const bf = { fontFamily: 'var(--font-body)' }
+  if (!poll?.options) return null
+  const myOption = poll.options.find(o => o.id === userBet?.option_id)
+  const isOpen = poll.status === 'open'
+
+  if (!isOpen) return <div style={{ fontSize: 12, color: '#3d4f70', ...bf }}>Betting closed.</div>
+
+  if (userBet && myOption) return (
+    <div style={{ background: 'rgba(74,159,111,0.07)', border: '1px solid rgba(74,159,111,0.2)', borderRadius: 8, padding: '12px 14px' }}>
+      <div style={{ fontSize: 13, color: '#4a9f6f', fontWeight: 600, ...bf, marginBottom: 8 }}>
+        Your bet: <strong>{(userBet.amount ?? 0).toLocaleString()} coins</strong> on <strong>{myOption.label}</strong>
+      </div>
+      <button onClick={onWithdraw} disabled={withdrawing}
+        style={{ fontSize: 11, padding: '6px 14px', background: 'transparent', border: '1px solid rgba(196,18,48,0.5)', color: '#c41230', cursor: 'pointer', borderRadius: 6, fontWeight: 600, ...bf, opacity: withdrawing ? 0.5 : 1 }}>
+        {withdrawing ? 'Withdrawing…' : 'Withdraw Bet'}
+      </button>
+      {betError && <div style={{ fontSize: 11, color: '#c41230', ...bf, marginTop: 6 }}>{betError}</div>}
+    </div>
+  )
+
+  if (!session) return (
+    <button onClick={signInWithDiscord}
+      style={{ width: '100%', background: '#5865F2', color: '#fff', border: 'none', padding: '10px', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderRadius: 6, ...bf }}>
+      Sign in with Discord to bet
+    </button>
+  )
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        {QUICK_AMOUNTS.map(q => (
+          <button key={q} onClick={() => onAmountChange(String(q))}
+            style={{ flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 6, ...bf, background: betAmount === String(q) ? 'rgba(201,162,39,0.2)' : 'rgba(255,255,255,0.04)', border: `1px solid ${betAmount === String(q) ? 'rgba(201,162,39,0.5)' : 'rgba(255,255,255,0.08)'}`, color: betAmount === String(q) ? '#c9a227' : '#6a80b0' }}>
+            +{q}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input type="number" min={1} placeholder="Custom amount…"
+          value={betAmount}
+          onChange={e => onAmountChange(e.target.value)}
+          style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#f0f4ff', padding: '8px 10px', fontSize: 13, outline: 'none', borderRadius: 6, ...bf }}
+        />
+        <button onClick={onBet} disabled={placing}
+          style={{ background: betOption ? '#c9a227' : 'rgba(201,162,39,0.25)', color: '#0a1a50', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '8px 16px', border: 'none', cursor: betOption ? 'pointer' : 'not-allowed', opacity: placing ? 0.5 : 1, borderRadius: 6, ...bf }}>
+          {placing ? '…' : 'Bet'}
+        </button>
+      </div>
+      {betError && <div style={{ fontSize: 11, color: '#c41230', ...bf, marginTop: 6 }}>{betError}</div>}
+      {!betOption && <div style={{ fontSize: 10, color: '#3d4f70', ...bf, marginTop: 5 }}>Click an option to select it</div>}
+    </div>
+  )
+}
+
+type PollModalProps = {
+  modalPoll: PollWithOptions
+  session: Session | null
+  signInWithDiscord: () => void
+  balance: number | null
+  userBets: Record<string, Bet | null>
+  betAmounts: Record<string, string>
+  betOptions: Record<string, string>
+  betErrors: Record<string, string>
+  placing: Record<string, boolean>
+  withdrawing: Record<string, boolean>
+  setBetAmounts: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  setBetOptions: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  handleBet: (pollId: string) => void
+  handleWithdraw: (pollId: string) => void
+  onClose: () => void
+}
+
+function PollModal({ modalPoll, session, signInWithDiscord, balance, userBets, betAmounts, betOptions, betErrors, placing, withdrawing, setBetAmounts, setBetOptions, handleBet, handleWithdraw, onClose }: PollModalProps) {
+  if (!modalPoll?.options) return null
+  const poll = modalPoll
+  const bf = { fontFamily: 'var(--font-body)' }
+  const df = { fontFamily: 'var(--font-display)' }
+  const totalPool = poll.bets.reduce((s, b) => s + (b.amount ?? 0), 0)
+  const userBet = userBets[poll.id] ?? null
+  const myOption = poll.options.find(o => o.id === userBet?.option_id)
+  const winnerOption = poll.options.find(o => o.id === poll.winner_option_id)
+  const isOpen = poll.status === 'open'
+  const isResolved = poll.status === 'resolved'
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,10,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#08102e', border: '1px solid rgba(201,162,39,0.2)', borderRadius: 16, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: isOpen ? '#4a9f6f' : isResolved ? '#c9a227' : '#6a80b0', background: isOpen ? 'rgba(74,159,111,0.12)' : isResolved ? 'rgba(201,162,39,0.12)' : 'rgba(106,128,176,0.12)', padding: '3px 8px', borderRadius: 4, ...bf }}>{isOpen ? '● Live' : isResolved ? '★ Resolved' : 'Closed'}</span>
+              {poll.closes_at && isOpen && <span style={{ fontSize: 11, color: '#6a80b0', ...bf }}>Closes {new Date(poll.closes_at).toLocaleString()}</span>}
+            </div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: '#f0f4ff', ...df, margin: 0, lineHeight: 1.3 }}>{poll.title}</h2>
+            {poll.description && <p style={{ fontSize: 13, color: '#6a80b0', ...bf, margin: '8px 0 0' }}>{poll.description}</p>}
+          </div>
+          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#6a80b0', cursor: 'pointer', fontSize: 18, width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
+        </div>
+        <div style={{ display: 'flex', gap: 24, padding: '14px 28px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
+          {[['Total Pool', `${totalPool.toLocaleString()} coins`], ['Bettors', String(poll.bets.length)], ['Options', String(poll.options.length)]].map(([label, val]) => (
+            <div key={label}>
+              <div style={{ fontSize: 10, color: '#3d4f70', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf, marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#c9a227', ...df }}>{val}</div>
+            </div>
+          ))}
+          {typeof balance === 'number' && (
+            <div style={{ marginLeft: 'auto' }}>
+              <div style={{ fontSize: 10, color: '#3d4f70', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf, marginBottom: 2 }}>Your Balance (withdrawn)</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#f0f4ff', ...df }}>{balance.toLocaleString()} coins</div>
+            </div>
+          )}
+        </div>
+        <div style={{ padding: '18px 28px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ fontSize: 10, color: '#3d4f70', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf, marginBottom: 12 }}>Outcomes</div>
+          {poll.options.map((opt, i) => {
+            const optPool = poll.bets.filter(b => b.option_id === opt.id).reduce((s, b) => s + (b.amount ?? 0), 0)
+            const pct = totalPool > 0 ? Math.round((optPool / totalPool) * 100) : Math.round(100 / poll.options.length)
+            const isWinner = poll.winner_option_id === opt.id
+            const isMyPick = userBet?.option_id === opt.id
+            const isSelected = betOptions[poll.id] === opt.id
+            const col = isWinner ? '#c9a227' : OPT_COLORS[i % OPT_COLORS.length]
+            const optBetCount = poll.bets.filter(b => b.option_id === opt.id).length
+            return (
+              <div key={opt.id}
+                onClick={() => { if (isOpen && session && !userBet) setBetOptions(o => ({ ...o, [poll.id]: isSelected ? '' : opt.id })) }}
+                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', marginBottom: 8, borderRadius: 10, cursor: isOpen && session && !userBet ? 'pointer' : 'default', background: isSelected ? `${col}18` : 'rgba(255,255,255,0.02)', border: `1px solid ${isSelected ? col + '50' : isWinner ? col + '30' : 'rgba(255,255,255,0.05)'}`, transition: 'all 0.15s' }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, background: `conic-gradient(${col} ${pct * 3.6}deg, rgba(255,255,255,0.06) 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#08102e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: col, ...bf }}>{pct}%</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: isWinner || isMyPick ? 700 : 500, color: isWinner ? col : '#d8e0f8', ...bf, marginBottom: 3 }}>{isWinner ? '★ ' : ''}{opt.label}{isMyPick && !isWinner ? ' ✓ your pick' : ''}</div>
+                  <div style={{ height: 5, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: col, borderRadius: 3, transition: 'width 0.4s' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: '#3d4f70', ...bf }}>{optBetCount} bet{optBetCount !== 1 ? 's' : ''} · {optPool.toLocaleString()} coins</div>
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: isWinner ? col : '#8898c8', ...df, minWidth: 60, textAlign: 'right' }}>{pct}%</div>
+              </div>
+            )
+          })}
+        </div>
+        {isResolved && winnerOption && (
+          <div style={{ padding: '14px 28px', background: 'rgba(201,162,39,0.08)', borderBottom: '1px solid rgba(201,162,39,0.15)' }}>
+            <div style={{ fontSize: 14, color: '#c9a227', fontWeight: 700, ...bf }}>★ Winner: {winnerOption.label}</div>
+            {myOption && userBet && <div style={{ fontSize: 12, marginTop: 4, color: myOption.id === winnerOption.id ? '#4a9f6f' : '#6a80b0', ...bf }}>{myOption.id === winnerOption.id ? `You won ${(userBet.payout ?? 0).toLocaleString()} coins!` : `You picked ${myOption.label} — better luck next time.`}</div>}
+          </div>
+        )}
+        <div style={{ padding: '20px 28px' }}>
+          <div style={{ fontSize: 10, color: '#3d4f70', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf, marginBottom: 12 }}>
+            {isOpen ? 'Place a Bet' : 'Betting'}
+          </div>
+          <BetPanel poll={poll} session={session} signInWithDiscord={signInWithDiscord} userBet={userBet} betAmount={betAmounts[poll.id] ?? ''} betOption={betOptions[poll.id] ?? ''} betError={betErrors[poll.id] ?? ''} placing={!!placing[poll.id]} withdrawing={!!withdrawing[poll.id]} onAmountChange={v => setBetAmounts(a => ({ ...a, [poll.id]: v }))} onOptionChange={id => setBetOptions(o => ({ ...o, [poll.id]: id }))} onBet={() => handleBet(poll.id)} onWithdraw={() => handleWithdraw(poll.id)} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PredictionMarketPage({ session, signInWithDiscord }: { session: Session | null; signInWithDiscord: () => void }) {
   const [polls, setPolls] = useState<PollWithOptions[]>([])
   const [balance, setBalance] = useState<number | null>(null)
@@ -3432,73 +3611,6 @@ function PredictionMarketPage({ session, signInWithDiscord }: { session: Session
 
   const bf = { fontFamily: 'var(--font-body)' }
   const df = { fontFamily: 'var(--font-display)' }
-  const QUICK_AMOUNTS = [10, 50, 100, 500]
-  const OPT_COLORS = ['#c9a227', '#4a9fd0', '#9b7ec8', '#4a9f6f', '#e07020', '#c41230']
-
-  const BetPanel = ({ pollId, compact }: { pollId: string; compact?: boolean }) => {
-    const poll = polls.find(p => p.id === pollId)
-    if (!poll) return null
-    const userBet = userBets[pollId]
-    const myOption = poll.options.find(o => o.id === userBet?.option_id)
-    const isOpen = poll.status === 'open'
-
-    if (!isOpen) return <div style={{ fontSize: 12, color: '#3d4f70', ...bf, padding: compact ? '0' : '10px 0' }}>Betting closed.</div>
-
-    if (userBet && myOption) return (
-      <div style={{ background: 'rgba(74,159,111,0.07)', border: '1px solid rgba(74,159,111,0.2)', borderRadius: 8, padding: '12px 14px' }}>
-        <div style={{ fontSize: 13, color: '#4a9f6f', fontWeight: 600, ...bf, marginBottom: 8 }}>
-          Your bet: <strong>{(userBet.amount ?? 0).toLocaleString()} coins</strong> on <strong>{myOption.label}</strong>
-        </div>
-        <button onClick={() => handleWithdraw(pollId)} disabled={withdrawing[pollId]}
-          style={{ fontSize: 11, padding: '6px 14px', background: 'transparent', border: '1px solid rgba(196,18,48,0.5)', color: '#c41230', cursor: 'pointer', borderRadius: 6, fontWeight: 600, ...bf, opacity: withdrawing[pollId] ? 0.5 : 1 }}>
-          {withdrawing[pollId] ? 'Withdrawing…' : 'Withdraw Bet'}
-        </button>
-        {betErrors[pollId] && <div style={{ fontSize: 11, color: '#c41230', ...bf, marginTop: 6 }}>{betErrors[pollId]}</div>}
-      </div>
-    )
-
-    if (!session) return (
-      <button onClick={signInWithDiscord}
-        style={{ width: '100%', background: '#5865F2', color: '#fff', border: 'none', padding: '10px', fontSize: 13, fontWeight: 700, cursor: 'pointer', borderRadius: 6, ...bf }}>
-        Sign in with Discord to bet
-      </button>
-    )
-
-    return (
-      <div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-          {QUICK_AMOUNTS.map(q => (
-            <button key={q} onClick={() => setBetAmounts(a => ({ ...a, [pollId]: String(q) }))}
-              style={{
-                flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer', borderRadius: 6, ...bf,
-                background: betAmounts[pollId] === String(q) ? 'rgba(201,162,39,0.2)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${betAmounts[pollId] === String(q) ? 'rgba(201,162,39,0.5)' : 'rgba(255,255,255,0.08)'}`,
-                color: betAmounts[pollId] === String(q) ? '#c9a227' : '#6a80b0',
-              }}>+{q}</button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input type="number" min={1} placeholder="Custom amount…"
-            value={betAmounts[pollId] ?? ''}
-            onChange={e => setBetAmounts(a => ({ ...a, [pollId]: e.target.value }))}
-            style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#f0f4ff', padding: '8px 10px', fontSize: 13, outline: 'none', borderRadius: 6, ...bf }}
-          />
-          <button onClick={() => handleBet(pollId)} disabled={placing[pollId]}
-            style={{
-              background: betOptions[pollId] ? '#c9a227' : 'rgba(201,162,39,0.25)',
-              color: '#0a1a50', fontWeight: 700, fontSize: 12, textTransform: 'uppercase',
-              letterSpacing: '0.08em', padding: '8px 16px', border: 'none',
-              cursor: betOptions[pollId] ? 'pointer' : 'not-allowed',
-              opacity: placing[pollId] ? 0.5 : 1, borderRadius: 6, ...bf,
-            }}>
-            {placing[pollId] ? '…' : 'Bet'}
-          </button>
-        </div>
-        {betErrors[pollId] && <div style={{ fontSize: 11, color: '#c41230', ...bf, marginTop: 6 }}>{betErrors[pollId]}</div>}
-        {!betOptions[pollId] && <div style={{ fontSize: 10, color: '#3d4f70', ...bf, marginTop: 5 }}>Click an option to select it</div>}
-      </div>
-    )
-  }
 
   return (
     <section id="polls" style={{ background: 'linear-gradient(180deg, #060f30 0%, #050d28 100%)', paddingTop: 80, paddingBottom: 80 }}>
@@ -3598,7 +3710,7 @@ function PredictionMarketPage({ session, signInWithDiscord }: { session: Session
 
                 {/* Bet panel on card */}
                 <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.12)' }}>
-                  <BetPanel pollId={poll.id} compact />
+                  <BetPanel poll={poll} session={session} signInWithDiscord={signInWithDiscord} userBet={userBets[poll.id] ?? null} betAmount={betAmounts[poll.id] ?? ''} betOption={betOptions[poll.id] ?? ''} betError={betErrors[poll.id] ?? ''} placing={!!placing[poll.id]} withdrawing={!!withdrawing[poll.id]} onAmountChange={v => setBetAmounts(a => ({ ...a, [poll.id]: v }))} onOptionChange={id => setBetOptions(o => ({ ...o, [poll.id]: id }))} onBet={() => handleBet(poll.id)} onWithdraw={() => handleWithdraw(poll.id)} />
                 </div>
               </div>
             )
@@ -3606,98 +3718,23 @@ function PredictionMarketPage({ session, signInWithDiscord }: { session: Session
         </div>
 
         {/* ── Poll detail modal ── */}
-        {openPoll && (() => {
-          const poll = polls.find(p => p.id === openPoll.id) ?? openPoll
-          const totalPool = poll.bets.reduce((s, b) => s + (b.amount ?? 0), 0)
-          const userBet = userBets[poll.id]
-          const myOption = poll.options.find(o => o.id === userBet?.option_id)
-          const winnerOption = poll.options.find(o => o.id === poll.winner_option_id)
-          const isOpen = poll.status === 'open'
-          const isResolved = poll.status === 'resolved'
-          return (
-            <div onClick={() => setOpenPoll(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,10,0.75)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-              <div onClick={e => e.stopPropagation()} style={{ background: '#08102e', border: '1px solid rgba(201,162,39,0.2)', borderRadius: 16, width: '100%', maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                {/* Modal header */}
-                <div style={{ padding: '24px 28px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: isOpen ? '#4a9f6f' : isResolved ? '#c9a227' : '#6a80b0', background: isOpen ? 'rgba(74,159,111,0.12)' : isResolved ? 'rgba(201,162,39,0.12)' : 'rgba(106,128,176,0.12)', padding: '3px 8px', borderRadius: 4, ...bf }}>{isOpen ? '● Live' : isResolved ? '★ Resolved' : 'Closed'}</span>
-                      {poll.closes_at && isOpen && <span style={{ fontSize: 11, color: '#6a80b0', ...bf }}>Closes {new Date(poll.closes_at).toLocaleString()}</span>}
-                    </div>
-                    <h2 style={{ fontSize: 22, fontWeight: 800, color: '#f0f4ff', ...df, margin: 0, lineHeight: 1.3 }}>{poll.title}</h2>
-                    {poll.description && <p style={{ fontSize: 13, color: '#6a80b0', ...bf, margin: '8px 0 0' }}>{poll.description}</p>}
-                  </div>
-                  <button onClick={() => setOpenPoll(null)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#6a80b0', cursor: 'pointer', fontSize: 18, width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
-                </div>
-
-                {/* Stats row */}
-                <div style={{ display: 'flex', gap: 24, padding: '14px 28px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexWrap: 'wrap' }}>
-                  {[['Total Pool', `${totalPool.toLocaleString()} coins`], ['Bettors', String(poll.bets.length)], ['Options', String(poll.options.length)]].map(([label, val]) => (
-                    <div key={label}>
-                      <div style={{ fontSize: 10, color: '#3d4f70', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf, marginBottom: 2 }}>{label}</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#c9a227', ...df }}>{val}</div>
-                    </div>
-                  ))}
-                  {typeof balance === 'number' && (
-                    <div style={{ marginLeft: 'auto' }}>
-                      <div style={{ fontSize: 10, color: '#3d4f70', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf, marginBottom: 2 }}>Your Balance (withdrawn)</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#f0f4ff', ...df }}>{balance.toLocaleString()} coins</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Full options list */}
-                <div style={{ padding: '18px 28px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: 10, color: '#3d4f70', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf, marginBottom: 12 }}>Outcomes</div>
-                  {poll.options.map((opt, i) => {
-                    const optPool = poll.bets.filter(b => b.option_id === opt.id).reduce((s, b) => s + (b.amount ?? 0), 0)
-                    const pct = totalPool > 0 ? Math.round((optPool / totalPool) * 100) : Math.round(100 / poll.options.length)
-                    const isWinner = poll.winner_option_id === opt.id
-                    const isMyPick = userBet?.option_id === opt.id
-                    const isSelected = betOptions[poll.id] === opt.id
-                    const col = isWinner ? '#c9a227' : OPT_COLORS[i % OPT_COLORS.length]
-                    const optBetCount = poll.bets.filter(b => b.option_id === opt.id).length
-                    return (
-                      <div key={opt.id}
-                        onClick={() => { if (isOpen && session && !userBet) setBetOptions(o => ({ ...o, [poll.id]: isSelected ? '' : opt.id })) }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', marginBottom: 8, borderRadius: 10, cursor: isOpen && session && !userBet ? 'pointer' : 'default', background: isSelected ? `${col}18` : 'rgba(255,255,255,0.02)', border: `1px solid ${isSelected ? col + '50' : isWinner ? col + '30' : 'rgba(255,255,255,0.05)'}`, transition: 'all 0.15s' }}>
-                        <div style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, background: `conic-gradient(${col} ${pct * 3.6}deg, rgba(255,255,255,0.06) 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#08102e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ fontSize: 10, fontWeight: 800, color: col, ...bf }}>{pct}%</span>
-                          </div>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: isWinner || isMyPick ? 700 : 500, color: isWinner ? col : '#d8e0f8', ...bf, marginBottom: 3 }}>{isWinner ? '★ ' : ''}{opt.label}{isMyPick && !isWinner ? ' ✓ your pick' : ''}</div>
-                          <div style={{ height: 5, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
-                            <div style={{ height: '100%', width: `${pct}%`, background: col, borderRadius: 3, transition: 'width 0.4s' }} />
-                          </div>
-                          <div style={{ fontSize: 11, color: '#3d4f70', ...bf }}>{optBetCount} bet{optBetCount !== 1 ? 's' : ''} · {optPool.toLocaleString()} coins</div>
-                        </div>
-                        <div style={{ fontSize: 28, fontWeight: 900, color: isWinner ? col : '#8898c8', ...df, minWidth: 60, textAlign: 'right' }}>{pct}%</div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Resolved banner */}
-                {isResolved && winnerOption && (
-                  <div style={{ padding: '14px 28px', background: 'rgba(201,162,39,0.08)', borderBottom: '1px solid rgba(201,162,39,0.15)' }}>
-                    <div style={{ fontSize: 14, color: '#c9a227', fontWeight: 700, ...bf }}>★ Winner: {winnerOption.label}</div>
-                    {myOption && userBet && <div style={{ fontSize: 12, marginTop: 4, color: myOption.id === winnerOption.id ? '#4a9f6f' : '#6a80b0', ...bf }}>{myOption.id === winnerOption.id ? `You won ${(userBet.payout ?? 0).toLocaleString()} coins!` : `You picked ${myOption.label} — better luck next time.`}</div>}
-                  </div>
-                )}
-
-                {/* Bet panel in modal */}
-                <div style={{ padding: '20px 28px' }}>
-                  <div style={{ fontSize: 10, color: '#3d4f70', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf, marginBottom: 12 }}>
-                    {isOpen ? 'Place a Bet' : 'Betting'}
-                  </div>
-                  <BetPanel pollId={poll.id} />
-                </div>
-              </div>
-            </div>
-          )
-        })()}
+        {openPoll && <PollModal
+          modalPoll={polls.find(p => p.id === openPoll.id) ?? openPoll}
+          session={session}
+          signInWithDiscord={signInWithDiscord}
+          balance={balance}
+          userBets={userBets}
+          betAmounts={betAmounts}
+          betOptions={betOptions}
+          betErrors={betErrors}
+          placing={placing}
+          withdrawing={withdrawing}
+          setBetAmounts={setBetAmounts}
+          setBetOptions={setBetOptions}
+          handleBet={handleBet}
+          handleWithdraw={handleWithdraw}
+          onClose={() => setOpenPoll(null)}
+        />}
       </div>
     </section>
   )
