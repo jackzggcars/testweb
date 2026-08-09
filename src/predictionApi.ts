@@ -168,6 +168,12 @@ export async function placeBet(pollId: string, optionId: string, amount: number,
   }
 }
 
+export async function withdrawBet(betId: string, discordId: string, amount: number): Promise<void> {
+  const { error } = await supabase.from('anderside_bets').delete().eq('id', betId)
+  if (error) throw new Error(error.message)
+  await ubPayout(discordId, amount)
+}
+
 export async function dismissPoll(pollId: string): Promise<void> {
   await supabase.from('anderside_bets').delete().eq('poll_id', pollId)
   await supabase.from('anderside_poll_options').delete().eq('poll_id', pollId)
