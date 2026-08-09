@@ -3341,18 +3341,20 @@ function PredictionMarketPage({ session, signInWithDiscord }: { session: Session
   const userId = session?.user?.id
 
   const loadAll = async () => {
-    const p = await getPolls()
-    setPolls(p)
-    if (userId) {
-      const bets: Record<string, Bet | null> = {}
-      for (const poll of p) {
-        bets[poll.id] = await getUserBet(poll.id, userId)
+    try {
+      const p = await getPolls()
+      setPolls(p)
+      if (userId) {
+        const bets: Record<string, Bet | null> = {}
+        for (const poll of p) {
+          try { bets[poll.id] = await getUserBet(poll.id, userId) } catch { bets[poll.id] = null }
+        }
+        setUserBets(bets)
       }
-      setUserBets(bets)
-    }
-    if (discordId) {
-      try { setBalance(await getBalance(discordId)) } catch {}
-    }
+      if (discordId) {
+        try { setBalance(await getBalance(discordId)) } catch {}
+      }
+    } catch {}
     setLoading(false)
   }
 

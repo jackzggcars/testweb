@@ -47,20 +47,24 @@ export async function getBalance(discordId: string): Promise<number> {
 // ── Polls ─────────────────────────────────────────────────────────────────────
 
 export async function getPolls(): Promise<PollWithOptions[]> {
-  const { data: polls, error } = await supabase
-    .from('anderside_polls')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (error) throw new Error(error.message)
+  try {
+    const { data: polls, error } = await supabase
+      .from('anderside_polls')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) return []
 
-  const { data: options } = await supabase.from('anderside_poll_options').select('*')
-  const { data: bets } = await supabase.from('anderside_bets').select('*')
+    const { data: options } = await supabase.from('anderside_poll_options').select('*')
+    const { data: bets } = await supabase.from('anderside_bets').select('*')
 
-  return (polls ?? []).map(p => ({
-    ...p,
-    options: (options ?? []).filter(o => o.poll_id === p.id),
-    bets: (bets ?? []).filter(b => b.poll_id === p.id),
-  }))
+    return (polls ?? []).map(p => ({
+      ...p,
+      options: (options ?? []).filter(o => o.poll_id === p.id),
+      bets: (bets ?? []).filter(b => b.poll_id === p.id),
+    }))
+  } catch {
+    return []
+  }
 }
 
 export async function createPoll(title: string, description: string, options: string[], closesAt: string | null): Promise<Poll> {
