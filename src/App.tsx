@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, Component } from 'react'
+import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import symbol from '@/imports/symbool.png'
 import flag from '@/imports/Andersideflag.png'
@@ -3327,6 +3328,21 @@ function StandingsPage() {
 }
 
 
+class SectionErrorBoundary extends Component<{ children: ReactNode }, { crashed: boolean; msg: string }> {
+  constructor(props: any) { super(props); this.state = { crashed: false, msg: '' } }
+  static getDerivedStateFromError(e: any) { return { crashed: true, msg: String(e?.message ?? e) } }
+  render() {
+    if (this.state.crashed) return (
+      <section style={{ background: '#050d28', padding: '60px 24px', textAlign: 'center' }}>
+        <div style={{ color: '#c41230', fontFamily: 'var(--font-body)', fontSize: 13 }}>
+          Section failed to load: {this.state.msg}
+        </div>
+      </section>
+    )
+    return this.props.children
+  }
+}
+
 function PredictionMarketPage({ session, signInWithDiscord }: { session: Session | null; signInWithDiscord: () => void }) {
   const [polls, setPolls] = useState<PollWithOptions[]>([])
   const [balance, setBalance] = useState<number | null>(null)
@@ -4014,7 +4030,9 @@ export default function App() {
       {activeElection && <ElectionPage election={activeElection} session={session} parties={parties} />}
       <ApprovalPage parties={parties} isAdmin={isAdmin} />
       <StandingsPage />
-      <PredictionMarketPage session={session} signInWithDiscord={signInWithDiscord} />
+      <SectionErrorBoundary>
+        <PredictionMarketPage session={session} signInWithDiscord={signInWithDiscord} />
+      </SectionErrorBoundary>
       <ConstitutionPage />
       <PoliticiansSection />
       <About />
