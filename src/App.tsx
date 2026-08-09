@@ -950,7 +950,7 @@ function AdminPanelPolls() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', ...bf }}>{p.title}</div>
-                    <div style={{ fontSize: 10, color: statusColor(p.status), textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginTop: 2, ...bf }}>{p.status} · {p.bets.length} bets · ${totalBets.toLocaleString()}</div>
+                    <div style={{ fontSize: 10, color: statusColor(p.status), textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginTop: 2, ...bf }}>{p.status} · {p.bets.length} bets · ${(totalBets || 0).toLocaleString()}</div>
                   </div>
                   {p.status === 'open' && (
                     <button onClick={() => handleClose(p.id)}
@@ -3420,7 +3420,7 @@ function PredictionMarketPage({ session, signInWithDiscord }: { session: Session
           <p style={{ fontSize: 14, color: '#6a80b0', ...bf, maxWidth: 500, margin: '0 auto' }}>
             Bet your UnbelievaBoat coins on political outcomes. Winners share the pool.
           </p>
-          {session && balance !== null && (
+          {session && typeof balance === 'number' && (
             <div style={{ marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(201,162,39,0.08)', border: '1px solid rgba(201,162,39,0.25)', padding: '6px 16px' }}>
               <span style={{ fontSize: 11, color: '#6a80b0', textTransform: 'uppercase', letterSpacing: '0.1em', ...bf }}>Your Balance</span>
               <span style={{ fontSize: 16, fontWeight: 800, color: '#c9a227', ...df }}>${balance.toLocaleString()}</span>
@@ -3502,7 +3502,7 @@ function PredictionMarketPage({ session, signInWithDiscord }: { session: Session
                 {/* Pool info */}
                 <div style={{ display: 'flex', gap: 20, marginBottom: 16, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 11, color: '#6a80b0', ...bf }}>
-                    Total pool: <span style={{ color: '#c9a227', fontWeight: 700 }}>${totalPool.toLocaleString()}</span>
+                    Total pool: <span style={{ color: '#c9a227', fontWeight: 700 }}>${(totalPool || 0).toLocaleString()}</span>
                   </div>
                   <div style={{ fontSize: 11, color: '#6a80b0', ...bf }}>
                     Bettors: <span style={{ color: '#f0f4ff', fontWeight: 700 }}>{poll.bets.length}</span>
@@ -3532,7 +3532,7 @@ function PredictionMarketPage({ session, signInWithDiscord }: { session: Session
                 {/* Already bet info */}
                 {userBet && myOption && poll.status !== 'resolved' && (
                   <div style={{ background: 'rgba(74,159,111,0.08)', border: '1px solid rgba(74,159,111,0.25)', padding: '8px 14px', marginBottom: 12, fontSize: 12, color: '#4a9f6f', ...bf }}>
-                    You bet ${userBet.amount.toLocaleString()} on <strong>{myOption.label}</strong>
+                    You bet ${(userBet.amount ?? 0).toLocaleString()} on <strong>{myOption.label}</strong>
                   </div>
                 )}
 
