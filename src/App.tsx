@@ -4410,6 +4410,17 @@ export default function App() {
     }
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
+
+    // Scroll to hash on initial load (e.g. shared links like /#polls)
+    const hash = window.location.hash.slice(1)
+    if (hash && ids.includes(hash)) {
+      // Defer so all sections have rendered before we scroll
+      setTimeout(() => {
+        const el = document.getElementById(hash)
+        if (el) el.scrollIntoView({ behavior: 'smooth' })
+      }, 120)
+    }
+
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
