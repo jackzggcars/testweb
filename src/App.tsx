@@ -10,6 +10,7 @@ import { checkAdmin, getAdmins, addAdmin, removeAdmin, type AdminEntry } from '.
 import { getParties, createParty, updateParty, deleteParty, type Party } from './partyApi'
 import { getActiveElection, getAllElections, startElection, closeElection, dismissElection, castVote, removeVote, getUserVote, getResults, type Election, type VoteResult } from './electionApi'
 import { getPolls, createPoll, closePoll, resolvePoll, dismissPoll, placeBet, withdrawBet, getUserBet, getBalance, type PollWithOptions, type Bet } from './predictionApi'
+import { getSimplePolls, createSimplePoll, closeSimplePoll, reopenSimplePoll, deleteSimplePoll, castVote as castSimpleVote, removeVote as removeSimpleVote, type SimplePollWithData } from './pollsApi'
 
 // Handles the OAuth redirect callback on page load
 async function handleAuthCallback() {
@@ -996,8 +997,95 @@ function AdminPanelPolls() {
   )
 }
 
+function AdminPanelSimplePolls() {
+  const [polls, setPolls] = useState<SimplePollWithData[]>([])
+  const [question, setQuestion] = useState('')
+  const [description, setDescription] = useState('')
+  const [options, setOptions] = useState(['', ''])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const bf = { fontFamily: 'var(--font-body)' }
+
+  const load = () => getSimplePolls().then(setPolls)
+  useEffect(() => { load() }, [])
+
+  const handleCreate = async () => {
+    const opts = options.map(o => o.trim()).filter(Boolean)
+    if (!question.trim()) { setError('Question is required.'); return }
+    if (opts.length < 2) { setError('At least 2 options required.'); return }
+    setSaving(true); setError('')
+    try { await createSimplePoll(question.trim(), description.trim(), opts); setQuestion(''); setDescription(''); setOptions(['', '']); await load() }
+    catch (e: any) { setError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  const inputStyle: React.CSSProperties = { width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#f0f4ff', padding: '8px 10px', fontSize: 13, outline: 'none', borderRadius: 6, ...bf }
+
+  return (
+    <div style={{ padding: '20px 24px' }}>
+      {/* Create form */}
+      <div style={{ marginBottom: 28, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '18px 20px' }}>
+        <div style={{ fontSize: 11, color: '#c9a227', textTransform: 'uppercase', letterSpacing: '0.2em', fontWeight: 700, marginBottom: 14, ...bf }}>Create Poll</div>
+        <input placeholder="Question" value={question} onChange={e => setQuestion(e.target.value)} style={{ ...inputStyle, marginBottom: 8 }} />
+        <input placeholder="Description (optional)" value={description} onChange={e => setDescription(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} />
+        <div style={{ fontSize: 11, color: '#6a80b0', ...bf, marginBottom: 8 }}>Options</div>
+        {options.map((opt, i) => (
+          <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+            <input placeholder={`Option ${i + 1}`} value={opt} onChange={e => setOptions(o => o.map((v, j) => j === i ? e.target.value : v))} style={{ ...inputStyle, flex: 1 }} />
+            {options.length > 2 && <button onClick={() => setOptions(o => o.filter((_, j) => j !== i))} style={{ color: '#c41230', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}>×</button>}
+          </div>
+        ))}
+        <button onClick={() => setOptions(o => [...o, ''])} style={{ fontSize: 11, color: '#6a80b0', background: 'none', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 5, padding: '5px 12px', cursor: 'pointer', marginBottom: 12, ...bf }}>+ Add Option</button>
+        {error && <div style={{ fontSize: 12, color: '#c41230', marginBottom: 8, ...bf }}>{error}</div>}
+        <button onClick={handleCreate} disabled={saving} style={{ background: '#c9a227', color: '#0a1a50', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '9px 20px', border: 'none', cursor: 'pointer', borderRadius: 6, opacity: saving ? 0.6 : 1, ...bf }}>
+          {saving ? 'Creating…' : 'Create Poll'}
+        </button>
+      </div>
+
+      {/* Existing polls */}
+      <div style={{ fontSize: 11, color: '#c9a227', textTransform: 'uppercase', letterSpacing: '0.2em', fontWeight: 700, marginBottom: 12, ...bf }}>Manage Polls</div>
+      {polls.length === 0 && <div style={{ fontSize: 12, color: '#3d4f70', ...bf }}>No polls yet.</div>}
+      {polls.map(p => {
+        const total = p.votes.length
+        return (
+          <div key={p.id} style={{ marginBottom: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '14px 16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#f0f4ff', ...bf }}>{p.question}</div>
+                {p.description && <div style={{ fontSize: 11, color: '#6a80b0', ...bf, marginTop: 2 }}>{p.description}</div>}
+                <div style={{ fontSize: 10, color: p.status === 'open' ? '#4a9f6f' : '#6a80b0', marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, ...bf }}>{p.status} · {total} vote{total !== 1 ? 's' : ''}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button onClick={() => { (p.status === 'open' ? closeSimplePoll : reopenSimplePoll)(p.id).then(load) }} style={{ fontSize: 11, color: p.status === 'open' ? '#c9a227' : '#4a9f6f', background: 'none', border: '1px solid currentColor', borderRadius: 5, padding: '4px 10px', cursor: 'pointer', ...bf }}>
+                  {p.status === 'open' ? 'Close' : 'Reopen'}
+                </button>
+                <button onClick={() => { if (confirm('Delete this poll?')) deleteSimplePoll(p.id).then(load) }} style={{ fontSize: 11, color: '#c41230', background: 'none', border: '1px solid #c41230', borderRadius: 5, padding: '4px 10px', cursor: 'pointer', ...bf }}>Delete</button>
+              </div>
+            </div>
+            {p.options.map(opt => {
+              const count = p.votes.filter(v => v.option_id === opt.id).length
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0
+              return (
+                <div key={opt.id} style={{ marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <span style={{ fontSize: 12, color: '#b8c4e8', ...bf }}>{opt.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#c9a227', ...bf }}>{pct}% ({count})</span>
+                  </div>
+                  <div style={{ height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${pct}%`, background: '#c9a227', transition: 'width 0.3s' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissElection }: { onClose: () => void; onPartiesChanged: () => void; onElectionChanged: () => void; onDismissElection: (id: string) => void }) {
-  const [tab, setTab] = useState<'admins' | 'parties' | 'elections' | 'constitution' | 'standings' | 'polls'>('admins')
+  const [tab, setTab] = useState<'admins' | 'parties' | 'elections' | 'constitution' | 'standings' | 'polls' | 'predictions'>('admins')
 
   useEffect(() => {
     const scrollY = window.scrollY
@@ -1057,7 +1145,7 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissEle
 
         {/* Tabs */}
         <div style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid rgba(201,162,39,0.15)', overflowX: 'auto' }}>
-          {(['admins', 'parties', 'elections', 'constitution', 'standings', 'polls'] as const).map((t) => (
+          {(['admins', 'parties', 'elections', 'constitution', 'standings', 'polls', 'predictions'] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className="px-5 py-3 text-xs font-bold uppercase tracking-widest transition-all duration-200 whitespace-nowrap"
               style={{
@@ -1068,7 +1156,7 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissEle
                 marginBottom: -1,
               }}
             >
-              {t === 'admins' ? '★ Admins' : t === 'parties' ? '🏛 Parties' : t === 'elections' ? '🗳 Elections' : t === 'constitution' ? '📜 Constitution' : t === 'standings' ? '🌍 Standing' : '📈 Polls'}
+              {t === 'admins' ? '★ Admins' : t === 'parties' ? '🏛 Parties' : t === 'elections' ? '🗳 Elections' : t === 'constitution' ? '📜 Constitution' : t === 'standings' ? '🌍 Standing' : t === 'polls' ? '📊 Polls' : '📈 Predictions'}
             </button>
           ))}
         </div>
@@ -1079,7 +1167,9 @@ function AdminPanel({ onClose, onPartiesChanged, onElectionChanged, onDismissEle
             : tab === 'parties' ? <AdminPanelParties onPartiesChanged={onPartiesChanged} />
             : tab === 'elections' ? <AdminPanelElections onElectionChanged={onElectionChanged} onDismissElection={onDismissElection} />
             : tab === 'constitution' ? <AdminPanelConstitution />
-            : tab === 'standings' ? <AdminPanelStandings /> : <AdminPanelPolls />}
+            : tab === 'standings' ? <AdminPanelStandings />
+            : tab === 'polls' ? <AdminPanelSimplePolls />
+            : <AdminPanelPolls />}
         </div>
       </div>
     </div>
@@ -1226,6 +1316,7 @@ function NavBar({
             { label: 'Approval', href: '#approval', id: 'approval' },
             { label: 'Standing', href: '#standing', id: 'standing' },
             { label: 'Polls', href: '#polls', id: 'polls' },
+            { label: 'Predictions', href: '#predictions', id: 'predictions' },
             { label: 'Constitution', href: '#constitution', id: 'constitution' },
             { label: 'Politicians', href: '#politicians', id: 'politicians' },
             { label: 'About', href: '#about', id: 'about' },
@@ -1315,6 +1406,7 @@ function NavBar({
             { label: 'Approval', href: '#approval', id: 'approval' },
             { label: 'Standing', href: '#standing', id: 'standing' },
             { label: 'Polls', href: '#polls', id: 'polls' },
+            { label: 'Predictions', href: '#predictions', id: 'predictions' },
             { label: 'Constitution', href: '#constitution', id: 'constitution' },
             { label: 'Politicians', href: '#politicians', id: 'politicians' },
             { label: 'About', href: '#about', id: 'about' },
@@ -3356,6 +3448,131 @@ class SectionErrorBoundary extends Component<{ children: ReactNode }, { crashed:
 const QUICK_AMOUNTS = [10, 50, 100, 500]
 const OPT_COLORS = ['#c9a227', '#4a9fd0', '#9b7ec8', '#4a9f6f', '#e07020', '#c41230']
 
+function PollsPage({ session, signInWithDiscord }: { session: Session | null; signInWithDiscord: () => void }) {
+  const [polls, setPolls] = useState<SimplePollWithData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [voting, setVoting] = useState<Record<string, boolean>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const bf = { fontFamily: 'var(--font-body)' }
+  const df = { fontFamily: 'var(--font-display)' }
+
+  const load = async () => { setPolls(await getSimplePolls()); setLoading(false) }
+  useEffect(() => { load() }, [session])
+
+  const userId = session?.user?.id
+
+  const handleVote = async (pollId: string, optionId: string) => {
+    if (!userId) return
+    setVoting(v => ({ ...v, [pollId]: true }))
+    setErrors(e => ({ ...e, [pollId]: '' }))
+    try { await castSimpleVote(pollId, optionId, userId); await load() }
+    catch (e: any) { setErrors(err => ({ ...err, [pollId]: e.message })) }
+    finally { setVoting(v => ({ ...v, [pollId]: false })) }
+  }
+
+  const handleUnvote = async (pollId: string) => {
+    if (!userId) return
+    setVoting(v => ({ ...v, [pollId]: true }))
+    try { await removeSimpleVote(pollId, userId); await load() }
+    catch {}
+    finally { setVoting(v => ({ ...v, [pollId]: false })) }
+  }
+
+  const OPTION_COLORS = ['#4a9f6f', '#c9a227', '#4a7cbf', '#9f4a6f', '#7f6fbf', '#bf9f4a']
+
+  return (
+    <section id="polls" style={{ background: 'linear-gradient(180deg, #050d28 0%, #060f30 100%)', paddingTop: 80, paddingBottom: 80 }}>
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '0 24px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.4em', color: '#c9a227', ...bf, textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>Nation of Anderside</div>
+          <h2 style={{ ...df, fontSize: 36, fontWeight: 900, color: '#f0f4ff', lineHeight: 1, margin: '0 0 12px' }}>Community Polls</h2>
+          <p style={{ color: '#6a80b0', ...bf, fontSize: 14, margin: 0 }}>
+            {session ? 'Click an option to cast your vote. You can change your vote on open polls.' : 'Sign in with Discord to vote.'}
+          </p>
+        </div>
+
+        {loading && <div style={{ textAlign: 'center', color: '#3d4f70', ...bf, fontSize: 13, padding: '60px 0' }}>Loading polls…</div>}
+
+        {!loading && polls.length === 0 && (
+          <div style={{ textAlign: 'center', color: '#3d4f70', ...bf, fontSize: 13, padding: '60px 0' }}>No polls yet — check back soon.</div>
+        )}
+
+        {!loading && polls.map(poll => {
+          const total = poll.votes.length
+          const myVote = userId ? poll.votes.find(v => v.user_id === userId) : null
+          const isOpen = poll.status === 'open'
+
+          return (
+            <div key={poll.id} style={{ marginBottom: 28, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, overflow: 'hidden' }}>
+              {/* Poll header */}
+              <div style={{ padding: '22px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.15em', color: isOpen ? '#4a9f6f' : '#6a80b0', background: isOpen ? 'rgba(74,159,111,0.12)' : 'rgba(106,128,176,0.1)', padding: '3px 8px', borderRadius: 4, ...bf }}>
+                    {isOpen ? '● Open' : '■ Closed'}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#3d4f70', ...bf }}>{total} vote{total !== 1 ? 's' : ''}</span>
+                </div>
+                <h3 style={{ ...df, fontSize: 20, fontWeight: 800, color: '#f0f4ff', margin: '0 0 4px', lineHeight: 1.3 }}>{poll.question}</h3>
+                {poll.description && <p style={{ fontSize: 13, color: '#6a80b0', ...bf, margin: 0 }}>{poll.description}</p>}
+              </div>
+
+              {/* Options */}
+              <div style={{ padding: '16px 24px 20px' }}>
+                {poll.options.map((opt, i) => {
+                  const count = poll.votes.filter(v => v.option_id === opt.id).length
+                  const pct = total > 0 ? Math.round((count / total) * 100) : 0
+                  const isMyPick = myVote?.option_id === opt.id
+                  const color = OPTION_COLORS[i % OPTION_COLORS.length]
+                  const canVote = isOpen && session && !voting[poll.id]
+
+                  return (
+                    <div key={opt.id}
+                      onClick={() => { if (canVote && !isMyPick) handleVote(poll.id, opt.id) }}
+                      style={{ marginBottom: 10, padding: '12px 14px', borderRadius: 10, border: `1px solid ${isMyPick ? color + '60' : 'rgba(255,255,255,0.06)'}`, background: isMyPick ? `${color}12` : 'rgba(255,255,255,0.02)', cursor: canVote && !isMyPick ? 'pointer' : 'default', transition: 'all 0.15s' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                          <span style={{ fontSize: 14, fontWeight: isMyPick ? 700 : 500, color: isMyPick ? '#f0f4ff' : '#c8d4f0', ...bf }}>{opt.label}</span>
+                          {isMyPick && <span style={{ fontSize: 10, color: color, fontWeight: 700, ...bf }}>✓ Your vote</span>}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 12, color: '#6a80b0', ...bf }}>{count} vote{count !== 1 ? 's' : ''}</span>
+                          <span style={{ fontSize: 16, fontWeight: 800, color: color, ...df, minWidth: 42, textAlign: 'right' }}>{pct}%</span>
+                        </div>
+                      </div>
+                      <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.4s' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Actions row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                  {!session && isOpen && (
+                    <button onClick={signInWithDiscord} style={{ fontSize: 12, color: '#7289da', background: 'rgba(114,137,218,0.1)', border: '1px solid rgba(114,137,218,0.3)', borderRadius: 6, padding: '7px 16px', cursor: 'pointer', fontWeight: 600, ...bf }}>
+                      Sign in with Discord to vote
+                    </button>
+                  )}
+                  {myVote && isOpen && (
+                    <button onClick={() => handleUnvote(poll.id)} disabled={!!voting[poll.id]} style={{ fontSize: 11, color: '#6a80b0', background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', ...bf, opacity: voting[poll.id] ? 0.5 : 1 }}>
+                      Remove vote
+                    </button>
+                  )}
+                  {errors[poll.id] && <span style={{ fontSize: 11, color: '#c41230', ...bf }}>{errors[poll.id]}</span>}
+                  <span style={{ fontSize: 11, color: '#3d4f70', ...bf, marginLeft: 'auto' }}>
+                    {new Date(poll.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 type BetPanelProps = {
   poll: PollWithOptions
   session: Session | null
@@ -3613,14 +3830,14 @@ function PredictionMarketPage({ session, signInWithDiscord }: { session: Session
   const df = { fontFamily: 'var(--font-display)' }
 
   return (
-    <section id="polls" style={{ background: 'linear-gradient(180deg, #060f30 0%, #050d28 100%)', paddingTop: 80, paddingBottom: 80 }}>
+    <section id="predictions" style={{ background: 'linear-gradient(180deg, #060f30 0%, #050d28 100%)', paddingTop: 80, paddingBottom: 80 }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 36, flexWrap: 'wrap', gap: 16 }}>
           <div>
             <div style={{ fontSize: 10, letterSpacing: '0.4em', color: '#c9a227', ...bf, textTransform: 'uppercase', fontWeight: 700, marginBottom: 8 }}>Prediction Markets</div>
-            <h2 style={{ ...df, fontSize: 36, fontWeight: 900, color: '#f0f4ff', lineHeight: 1, margin: 0 }}>Political Polls</h2>
+            <h2 style={{ ...df, fontSize: 36, fontWeight: 900, color: '#f0f4ff', lineHeight: 1, margin: 0 }}>Predictions</h2>
           </div>
           {session && typeof balance === 'number' ? (
             <div style={{ textAlign: 'right' }}>
@@ -4178,7 +4395,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const ids = ['parliament', 'court', 'parties', 'approval', 'standing', 'polls', 'constitution', 'politicians', 'about', 'join']
+    const ids = ['parliament', 'court', 'parties', 'approval', 'standing', 'polls', 'predictions', 'constitution', 'politicians', 'about', 'join']
     const onScroll = () => {
       const mid = window.innerHeight * 0.4
       let current = ''
@@ -4205,6 +4422,7 @@ export default function App() {
       {activeElection && <ElectionPage election={activeElection} session={session} parties={parties} />}
       <ApprovalPage parties={parties} isAdmin={isAdmin} />
       <StandingsPage />
+      <PollsPage session={session} signInWithDiscord={signInWithDiscord} />
       <SectionErrorBoundary>
         <PredictionMarketPage session={session} signInWithDiscord={signInWithDiscord} />
       </SectionErrorBoundary>
