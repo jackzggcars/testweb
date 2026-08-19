@@ -4411,14 +4411,22 @@ export default function App() {
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
 
-    // Scroll to hash on initial load (e.g. shared links like /#polls)
+    // Scroll to hash on initial load (e.g. shared links like /#polls).
+    // Retry until the element exists — async-loaded sections may not be in
+    // the DOM immediately.
     const hash = window.location.hash.slice(1)
     if (hash && ids.includes(hash)) {
-      // Defer so all sections have rendered before we scroll
-      setTimeout(() => {
+      let attempts = 0
+      const tryScroll = () => {
         const el = document.getElementById(hash)
-        if (el) el.scrollIntoView({ behavior: 'smooth' })
-      }, 120)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' })
+        } else if (attempts < 40) {
+          attempts++
+          setTimeout(tryScroll, 100)
+        }
+      }
+      setTimeout(tryScroll, 100)
     }
 
     return () => window.removeEventListener('scroll', onScroll)
