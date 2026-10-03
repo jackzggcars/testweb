@@ -8,7 +8,7 @@ import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simp
 import { supabase } from './supabaseClient'
 import { checkAdmin, getAdmins, addAdmin, removeAdmin, type AdminEntry } from './adminApi'
 import { getParties, createParty, updateParty, deleteParty, type Party } from './partyApi'
-import { getActiveElection, getAllElections, startElection, closeElection, dismissElection, castVote, removeVote, getUserVote, getResults, type Election, type VoteResult } from './electionApi'
+import { getActiveElection, getAllElections, startElection, closeElection, dismissElection, castVote, removeVote, getUserVote, getResults, getBonusVotes, addBonusVotes, removeBonusVote, type BonusVote, type Election, type VoteResult } from './electionApi'
 import { getPolls, createPoll, closePoll, resolvePoll, dismissPoll, placeBet, withdrawBet, getUserBet, getBalance, type PollWithOptions, type Bet } from './predictionApi'
 import { getSimplePolls, createSimplePoll, closeSimplePoll, reopenSimplePoll, deleteSimplePoll, castVote as castSimpleVote, removeVote as removeSimpleVote, type SimplePollWithData } from './pollsApi'
 
@@ -391,11 +391,42 @@ function AdminPanelElections({ onElectionChanged, onDismissElection }: { onElect
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [nameFocused, setNameFocused] = useState(false)
+  const [parties, setParties] = useState<Party[]>([])
+  const [bonusParty, setBonusParty] = useState('')
+  const [bonusCount, setBonusCount] = useState('')
+  const [bonusNote, setBonusNote] = useState('')
+  const [bonusVotes, setBonusVotes] = useState<BonusVote[]>([])
+  const [bonusError, setBonusError] = useState('')
 
   const load = () => getAllElections().then((e) => { setElections(e); setLoading(false) })
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); getParties().then(setParties).catch(() => {}) }, [])
 
   const active = elections.find((e) => e.status === 'active')
+  const voteTarget = active ?? elections.find((e) => e.status === 'called')
+
+  const loadBonus = () => { if (voteTarget) getBonusVotes(voteTarget.id).then(setBonusVotes) }
+  useEffect(() => { loadBonus() }, [voteTarget?.id])
+
+  const handleAddBonus = async () => {
+    if (!voteTarget) return
+    const n = Number(bonusCount)
+    if (!bonusParty) { setBonusError('Pick a party.'); return }
+    if (!Number.isInteger(n) || n === 0) { setBonusError('Enter a whole number of votes (negative removes votes).'); return }
+    setSaving(true); setBonusError('')
+    try {
+      await addBonusVotes(voteTarget.id, bonusParty, n, bonusNote)
+      setBonusCount(''); setBonusNote('')
+      loadBonus(); onElectionChanged()
+    } catch (e: any) { setBonusError(e.message) }
+    finally { setSaving(false) }
+  }
+
+  const handleRemoveBonus = async (id: number) => {
+    setSaving(true); setBonusError('')
+    try { await removeBonusVote(id); loadBonus(); onElectionChanged() }
+    catch (e: any) { setBonusError(e.message) }
+    finally { setSaving(false) }
+  }
 
   const handleStart = async () => {
     if (!name.trim()) { setError('Please enter an election name.'); return }
@@ -458,6 +489,58 @@ function AdminPanelElections({ onElectionChanged, onDismissElection }: { onElect
         </div>
         {error && <p style={{ color: '#c41230', fontFamily: 'var(--font-body)', fontSize: 12, marginTop: 6 }}>{error}</p>}
       </div>
+
+      {/* Add votes to the running election */}
+      {voteTarget && (
+        <div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-body)', color: '#c9a227', textTransform: 'uppercase', letterSpacing: '0.2em', fontWeight: 600, marginBottom: 4 }}>
+            Add Votes
+          </div>
+          <div style={{ fontSize: 12, color: '#6a80b0', fontFamily: 'var(--font-body)', marginBottom: 10 }}>
+            Adds to the live tally of "{voteTarget.name}" without closing it or touching real votes. Use a negative number to subtract.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select value={bonusParty} onChange={(e) => setBonusParty(e.target.value)}
+                style={{ background: '#081440', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', fontFamily: 'var(--font-body)', padding: '6px 10px', fontSize: 13, flex: 1 }}>
+                <option value="">Select party…</option>
+                {parties.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.abbr})</option>)}
+              </select>
+              <input type="number" step={1} value={bonusCount} onChange={(e) => setBonusCount(e.target.value)}
+                placeholder="Votes"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', fontFamily: 'var(--font-body)', outline: 'none', padding: '6px 10px', fontSize: 13, width: 90 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={bonusNote} onChange={(e) => setBonusNote(e.target.value)} placeholder="Note (optional)"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1.5px solid rgba(201,162,39,0.2)', color: '#f0f4ff', fontFamily: 'var(--font-body)', outline: 'none', padding: '8px 12px', fontSize: 13, flex: 1 }} />
+              <button onClick={handleAddBonus} disabled={saving || !bonusParty || !bonusCount}
+                style={{ background: '#c9a227', color: '#0a1a50', fontFamily: 'var(--font-body)', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '8px 16px', border: 'none', cursor: 'pointer', opacity: saving || !bonusParty || !bonusCount ? 0.4 : 1, whiteSpace: 'nowrap' }}>
+                Add Votes
+              </button>
+            </div>
+          </div>
+          {bonusError && <p style={{ color: '#c41230', fontFamily: 'var(--font-body)', fontSize: 12, marginTop: 6 }}>{bonusError}</p>}
+          {bonusVotes.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxHeight: 160, overflowY: 'auto' }}>
+              {bonusVotes.map((b) => {
+                const party = parties.find((p) => String(p.id) === String(b.party_id))
+                return (
+                  <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '6px 10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: 12, color: '#f0f4ff', fontFamily: 'var(--font-body)' }}>
+                      <strong style={{ color: b.votes > 0 ? '#c9a227' : '#c41230' }}>{b.votes > 0 ? '+' : ''}{b.votes}</strong> {party?.abbr ?? 'Unknown'}
+                      {b.note && <span style={{ color: '#6a80b0' }}> — {b.note}</span>}
+                    </div>
+                    <button onClick={() => handleRemoveBonus(b.id)} disabled={saving}
+                      style={{ fontSize: 11, padding: '3px 8px', background: 'transparent', color: '#6a80b0', border: '1px solid rgba(106,128,176,0.3)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
+                      Undo
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Election list */}
       <div>

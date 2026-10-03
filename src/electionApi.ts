@@ -104,6 +104,42 @@ export async function removeVote(electionId: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+export type BonusVote = {
+  id: number
+  election_id: string
+  party_id: string
+  votes: number
+  note: string | null
+  created_by: string | null
+  created_at: string
+}
+
+// Admin-added votes live in their own table so real votes are never touched.
+export async function getBonusVotes(electionId: string): Promise<BonusVote[]> {
+  const { data, error } = await supabase
+    .from('anderside_bonus_votes')
+    .select('*')
+    .eq('election_id', electionId)
+    .order('created_at', { ascending: false })
+  if (error) return [] // table not created yet -> behave as if there are none
+  return data ?? []
+}
+
+export async function addBonusVotes(electionId: string, partyId: string, votes: number, note?: string): Promise<void> {
+  if (!Number.isInteger(votes) || votes === 0) throw new Error('Enter a whole number of votes (not 0).')
+  const { data: session } = await supabase.auth.getSession()
+  const created_by = (session.session?.user?.user_metadata?.provider_id as string | undefined) ?? null
+  const { error } = await supabase
+    .from('anderside_bonus_votes')
+    .insert({ election_id: electionId, party_id: partyId, votes, note: note?.trim() || null, created_by })
+  if (error) throw new Error(error.message)
+}
+
+export async function removeBonusVote(id: number): Promise<void> {
+  const { error } = await supabase.from('anderside_bonus_votes').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 export async function getResults(electionId: string): Promise<VoteResult[]> {
   // Get all votes with party info
   const { data: votes, error } = await supabase
@@ -122,8 +158,22 @@ export async function getResults(electionId: string): Promise<VoteResult[]> {
     counts[v.party_id].votes++
   }
 
-  const total = Object.values(counts).reduce((s, c) => s + c.votes, 0)
+  // Merge in admin-added votes
+  const bonus = await getBonusVotes(electionId)
+  if (bonus.length > 0) {
+    const { data: parties } = await supabase.from('anderside_parties').select('id, name, abbr, color')
+    const byId = new Map<string, any>((parties ?? []).map((p: any) => [String(p.id), p]))
+    for (const b of bonus) {
+      const p = byId.get(String(b.party_id))
+      if (!p) continue
+      if (!counts[b.party_id]) counts[b.party_id] = { name: p.name, abbr: p.abbr, color: p.color, votes: 0 }
+      counts[b.party_id].votes += b.votes
+    }
+  }
+
+  const total = Object.values(counts).reduce((s, c) => s + Math.max(c.votes, 0), 0)
   return Object.entries(counts)
+    .filter(([, c]) => c.votes > 0)
     .map(([party_id, c]) => ({
       party_id,
       party_name: c.name,

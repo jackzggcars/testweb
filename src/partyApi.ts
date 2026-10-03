@@ -36,6 +36,7 @@ export async function updateParty(id: string, party: Omit<Party, 'id'>): Promise
 export async function deleteParty(id: string): Promise<Party[]> {
   const { error: votesError } = await supabase.from('anderside_votes').delete().eq('party_id', id)
   if (votesError) throw new Error(votesError.message)
+  await supabase.from('anderside_bonus_votes').delete().eq('party_id', id)
   const { error } = await supabase.from('anderside_parties').delete().eq('id', id)
   if (error) throw new Error(error.message)
   return getParties()
